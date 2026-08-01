@@ -1,0 +1,24 @@
+[
+  {
+    "x": 919.433142890585,
+    "y": 571.0859657629651,
+    "energy": 53.02609882421058,
+    "level": 7,
+    "age": 3075,
+    "genes": {
+      "speed": 1.5,
+      "sense": 40.0,
+      "mass": 4.457539760937498,
+      "metabolism": 0.02,
+      "mut_rate": 0.08,
+      "major_mut_rate": 0.1,
+      "divide_chance": 0.5,
+      "diet": 0,
+      "interact": 0.5,
+      "dmg_phot": 0.6,
+      "dmg_zoop": 1.2,
+      "dmg_poly": 1.0,
+      "lifespan_ticks": 3636
+    }
+  }
+]
