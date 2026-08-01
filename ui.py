@@ -250,6 +250,10 @@ class PopulationGraph:
         max_count = 0
         for _, frame in history_list:
             classes.update(frame.keys())
+            frame_total = sum(frame.values())
+            # Max must cover both single-class peaks AND the total line
+            if frame_total > max_count:
+                max_count = frame_total
             for val in frame.values():
                 if val > max_count:
                     max_count = val

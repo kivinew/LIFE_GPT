@@ -54,14 +54,8 @@ MIN_MASS_DMG_EFF = 0.45
 # ── Level system ─────────────────────────────────────────────────
 LEVEL_UP_THRESHOLD = 0.60  # Was 0.50 — increased to slow PHOT leveling
 # ── Division conditions ─────────────────────────────────────
-DIVIDE_THRESHOLD = 0.8  # Divide when 80% full (balanced for all diets)
-DIVIDE_MIN_TEMP = 0.15  # Minimum temperature for division (cold slows)
-DIVIDE_MAX_TEMP = 0.95  # Maximum temperature for division (heat stress)
-DIVIDE_MIN_FOOD = 0.05  # Minimum food energy at cell position for division
-DIVIDE_MAX_AGE_RATIO = (
-    0.75  # Max age/lifespan ratio for division (0.75 = 75% of lifespan)
-)
-DIVIDE_MIN_AGE = 10  # Minimum age before cell can divide (prevents instant splitting)
+DIVIDE_ENERGY_RATIO = 0.95  # Energy must be 95% of max to divide
+DIVIDE_MIN_AGE = 1000  # Minimum age before cell can divide
 LEVEL_DOWN_THRESHOLD = 3.0
 MAX_LEVEL = 10
 LEVEL_MASS_BASE = 2.0
@@ -79,14 +73,6 @@ PHOT_INITIAL_ENERGY = (
 # ── Aging metabolism ─────────────────────────────────────────────
 # Metabolism increases with age (0.0 = no increase, 1.0 = 2x at max lifespan)
 AGING_METABOLISM_FACTOR = 0.5
-
-# ── Seasonal breeding multipliers ─────────────────────────────────────
-SEASON_DIVIDE_MULTIPLIERS = {
-    "spring": 1.3,
-    "summer": 1.0,
-    "autumn": 0.8,
-    "winter": 0.5,
-}
 
 # ── Zoophage hunting AI constants ──────────────────────────────────────
 ZOO_WEAK_TARGET_THRESHOLD = (

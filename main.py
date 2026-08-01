@@ -55,7 +55,6 @@ from config import (
     COMBAT_DAMAGE_GAIN,
     MASS_DMG_EFFICIENCY,
     MIN_MASS_DMG_EFF,
-    DIVIDE_THRESHOLD,
     LEVEL_UP_THRESHOLD,
     LEVEL_DOWN_THRESHOLD,
     MAX_LEVEL,
@@ -876,7 +875,7 @@ def main():
         if sel_cell:
             lines = [
                 f"{tr('selected')}:",
-                f"  {tr('energy')}: {sel_cell.energy:.1f}",
+                f"  {tr('energy')}: {sel_cell.energy:.1f} / {sel_cell.max_energy:.1f}",
                 f"  {tr('level')}: {sel_cell.level}",
                 f"  {tr('age')}: {sel_cell.age}",
                 f"  {tr('speed')}: {sel_cell.genome.speed:.2f}",

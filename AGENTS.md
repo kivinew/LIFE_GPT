@@ -11,6 +11,7 @@ python setup.py build_ext --inplace  # build Cython extension (optional, ~10x sp
 Pygame cellular evolution simulator. Cells have heritable genomes (17 traits) controlling behavior: speed, sense, mass, metabolism, mut_rate, diet, interact, divide_chance, dmg_phot/dmg_zoop/dmg_poly, lifespan_ticks, major_mut_rate, learning_rate, memory_size, herd_tendency, cautious.
 
 - **Diet types**: PHOT=0 (photosynthesis), ZOOP=1 (predator), POLY=2 (both).
+- **PHOT cells do not attack ZOOP cells** — phototrophs only defend themselves against polyphages.
 - **Continuous interaction**: float 0.01–1.0, not discrete. Thresholds in `config.py`: `COOP_INTERACT_THRESHOLD=0.34`, `AGGRO_INTERACT_THRESHOLD=0.75`.
 - **Hotkeys**: Q=0.2, W=0.5, E=0.8 interaction. Rounded to 2 decimals to reduce genome fragmentation.
 - **Spatial hash grid**: cell `cls` = `diet*1000 + hash(rounded genome params) % 1000`. Diet is bucketed, so different diets are ALWAYS different classes. Identical genomes share color/class. Manual edits (hotkeys 1/2/3, +/-/↑↓, Q/W/E, X) call `Cell.refresh_class()` to recompute cls + color.
@@ -73,7 +74,7 @@ Temperature effects (all scale down with cold):
 - Food regen: `field._get_temp_regen_factor()` (field.py).
 - Movement: `move_phase` temp_speed_mult (cold slows).
 - Metabolism: `metabolism_phase` multiplies cost by `TEMP_METABOLISM_MIN=0.5` at temp 0 → 1.0 at temp 1.
-- Division: `can_divide` — probability factor `(temp-0.15)/0.5`, falls to 0 above `DIVIDE_MAX_TEMP`.
+- Division: `can_divide` — energy > 95% of max and age >= 1000 ticks.
 
 ### Food regeneration
 Slider shows an **effective** percentage (0–100%, base 30%), updated every tick as

@@ -33,7 +33,6 @@ from config import (
     COMBAT_DAMAGE_GAIN,
     MASS_DMG_EFFICIENCY,
     MIN_MASS_DMG_EFF,
-    DIVIDE_THRESHOLD,
     LEVEL_UP_THRESHOLD,
     LEVEL_DOWN_THRESHOLD,
     MAX_LEVEL,
@@ -71,11 +70,7 @@ from config import (
     AGING_METABOLISM_FACTOR,
     MAJOR_DIET_RATE,
     MAJOR_SENSE_RATE,
-    DIVIDE_THRESHOLD,
-    DIVIDE_MIN_TEMP,
-    DIVIDE_MAX_TEMP,
-    DIVIDE_MIN_FOOD,
-    DIVIDE_MAX_AGE_RATIO,
+    DIVIDE_ENERGY_RATIO,
     DIVIDE_MIN_AGE,
 )
 from spatial import get_neighbors
@@ -229,7 +224,12 @@ class Cell:
         if d == PHOT and random.random() < 0.35:
             for j in get_neighbors(grid, self.x, self.y, radius=2):
                 other = cells[j]
-                if other is not self and other.energy > 0 and other.cls != self.cls:
+                if (
+                    other is not self
+                    and other.energy > 0
+                    and other.cls != self.cls
+                    and other.genome.diet != ZOOP
+                ):
                     dx, dy = other.x - self.x, other.y - self.y
                     dist_sq = dx * dx + dy * dy
                     if 0 < dist_sq <= min(sense, 50.0) ** 2:
@@ -499,6 +499,9 @@ class Cell:
         for j in get_neighbors(grid, self.x, self.y, radius=1):
             other = cells[j]
             if other is not self and other.energy > 0 and other.cls != my_cls:
+                # PHOT cells do not attack ZOOP cells
+                if my_diet == PHOT and other.genome.diet == ZOOP:
+                    continue
                 dx = other.x - self.x
                 dy = other.y - self.y
                 dist_sq = dx * dx + dy * dy
@@ -837,7 +840,7 @@ class Cell:
         self.metabolism_phase(dt, field.temperature)
         self.stress_phase()
         self.level_phase()
-        self.divide_phase(field, cells, grid)
+        self.divide_phase(cells, grid)
         self.social_phase(cells, grid)
         self.aging_phase(dt)
         self.disease_phase(cells, grid, dt)
@@ -857,7 +860,7 @@ class Cell:
         self.metabolism_phase(dt, field.temperature)
         self.stress_phase()
         self.level_phase()
-        self.divide_phase(field, cells, grid)
+        self.divide_phase(cells, grid)
         self.social_phase(cells, grid)
         self.aging_phase(dt)
         self.disease_phase(cells, grid, dt)
@@ -909,64 +912,31 @@ class Cell:
                 self.reaction_timer = 180
                 self.chase_timer = 180
 
-    def can_divide(self, field=None):
-        """Check if cell can divide based on energy, temperature, food, and age."""
-        max_e = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
-
-        # Energy condition
-        if self.energy < max_e * DIVIDE_THRESHOLD:
+    def can_divide(self):
+        """Check if cell can divide based on energy and age."""
+        if self.energy < self.max_energy * DIVIDE_ENERGY_RATIO:
             return False
-
-        # Age condition: must be old enough and not too old
         if self.age < DIVIDE_MIN_AGE:
             return False
-        if self.genome.lifespan_ticks > 0:
-            age_ratio = self.age / self.genome.lifespan_ticks
-            if age_ratio > DIVIDE_MAX_AGE_RATIO:
-                return False
-
-        # Temperature condition — gradual: cold lowers division probability
-        if field is not None:
-            temp = field.temperature
-            if temp <= DIVIDE_MIN_TEMP:
-                return False
-            temp_factor = max(0.0, min(1.0, (temp - DIVIDE_MIN_TEMP) / 0.5))
-            if temp > DIVIDE_MAX_TEMP:
-                temp_factor *= max(0.0, 1.0 - (temp - DIVIDE_MAX_TEMP) / 0.2)
-            if random.random() > temp_factor:
-                return False
-
-        # Food condition: sufficient food at cell position
-        if field is not None:
-            fx, fy = int(self.x), int(self.y)
-            fw, fh = field.w, field.h
-            if 0 <= fx < fw and 0 <= fy < fh:
-                if field.data[fx, fy] < DIVIDE_MIN_FOOD:
-                    return False
-
         return True
 
-    def divide(self, field=None):
+    def divide(self):
         """Divide the cell if conditions are met. Returns child Cell or None."""
-        if not self.can_divide(field):
+        if not self.can_divide():
             return None
 
         from genome import Genome
 
-        max_e = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
         zoo_elite = (
             self.genome.diet == ZOOP
             and self.level >= MAX_LEVEL
             and random.random() < 0.03
         )
         available = self.energy if zoo_elite else self.energy * 0.90
-        parent_e = max_e * 0.10
+        parent_e = self.max_energy * 0.10
         child_e = available - parent_e
 
-        # Removed divide_chance check - always try if energy allows
-        if self.energy < max_e * DIVIDE_THRESHOLD:
-            return None
-        if child_e < max_e * 0.15:  # Lowered from 0.20
+        if child_e < self.max_energy * 0.15:
             return None
 
         child_genome = self.genome.clone_mutate()
@@ -984,10 +954,6 @@ class Cell:
         # Check for speciation event during division
         if self.genome.is_new_species(child_genome):
             # Trigger biological consequences of speciation
-            from config import SPECIES_SIMILARITY_THRESHOLD
-            from field import ResourceField
-            from genome import SPECIES_SIMILARITY_THRESHOLD as GENOME_THRESHOLD
-
             # 1. Resource competition dynamics between species
             # New species compete for resources with parent species
             if hasattr(self, "field"):
@@ -1031,7 +997,7 @@ class Cell:
         child.memory = self.memory.clone()  # Deep copy to avoid shared memory
 
         if zoo_elite:
-            child.energy = max_e * 0.30
+            child.energy = self.max_energy * 0.30
         else:
             child.energy = child_e
             self.energy = self.energy - available + parent_e
@@ -1042,11 +1008,11 @@ class Cell:
         play_sound("divide")
         return child
 
-    def divide_phase(self, field, cells, grid):
+    def divide_phase(self, cells, grid):
         """Attempt to divide if all conditions are met."""
         if self.energy <= 0:
             return
-        child = self.divide(field)
+        child = self.divide()
         if child is not None and cells is not None:
             cells.append(child)
 
