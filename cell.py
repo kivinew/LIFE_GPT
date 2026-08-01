@@ -58,6 +58,7 @@ from config import (
     CYAN,
     RED,
     TEAL,
+    LEVEL_COLOR,
     DECOMPOSITION_TICKS,
     DISEASE_CHANCE,
     DISEASE_DURATION,
@@ -146,6 +147,7 @@ class Cell:
             else (PHOT_INITIAL_ENERGY if self.genome.diet == PHOT else 40.0)
         )
         self.selected = False
+        self._heartbeat_timer = 0
         self.level = 0
         self.age = 0
 
@@ -428,7 +430,7 @@ class Cell:
         d = self.genome.diet
         if d in (PHOT, POLY):
             eat = field.consume(int(self.x), int(self.y), 0.15 * dt)
-            if eat > 0:
+            if eat > 0 and self.selected:
                 play_sound("eating")
             mass_eff = max(MIN_MASS_EFFICIENCY, 5.0 / self.genome.mass)
             diet_eff = PHOT_FEED_EFFICIENCY if d == PHOT else POLY_FEED_EFFICIENCY
@@ -595,6 +597,18 @@ class Cell:
             self.energy += STRESS_ENERGY_GAIN
             self.genome.mass = max(STRESS_MASS_MIN, self.genome.mass - STRESS_MASS_LOSS)
             play_sound("mass_down")
+
+    def _heartbeat_tick(self):
+        """Play heartbeat sound for selected cells with low energy."""
+        if not self.selected or self.energy <= 0:
+            return
+        if self.energy < self.max_energy * 0.30:
+            self._heartbeat_timer += 1
+            if self._heartbeat_timer >= 60:
+                self._heartbeat_timer = 0
+                play_sound("heartbeat")
+        else:
+            self._heartbeat_timer = 0
 
     # ── Phase 9: level ──
     def level_phase(self):
@@ -839,6 +853,7 @@ class Cell:
         self.combat_phase(cells, grid, pack_decision, dt, field)
         self.metabolism_phase(dt, field.temperature)
         self.stress_phase()
+        self._heartbeat_tick()
         self.level_phase()
         self.divide_phase(cells, grid)
         self.social_phase(cells, grid)
@@ -859,6 +874,7 @@ class Cell:
         self.feed_phase(field, cells, grid, dt)
         self.metabolism_phase(dt, field.temperature)
         self.stress_phase()
+        self._heartbeat_tick()
         self.level_phase()
         self.divide_phase(cells, grid)
         self.social_phase(cells, grid)
@@ -1073,6 +1089,12 @@ class Cell:
 
         bw2 = r * 2
         max_e = self.genome.mass * self.genome.mass * DRAW_ENERGY_MASS_COEFF
+        # Level indicator (thin bar above the energy bar)
+        lw = bw2 * 2
+        pygame.draw.rect(surf, (40, 40, 45), (x - bw2, y - r - 9, lw, 2), 0, 1)
+        lvl_w = int((self.level / MAX_LEVEL) * lw)
+        if lvl_w > 0:
+            pygame.draw.rect(surf, LEVEL_COLOR, (x - bw2, y - r - 9, lvl_w, 2), 0, 1)
         pygame.draw.rect(surf, (30, 30, 30), (x - bw2, y - r - 6, bw2 * 2, 3), 0, 2)
         if max_e > 0:
             pw = int((self.energy / max_e) * bw2 * 2)

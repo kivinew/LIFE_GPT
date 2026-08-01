@@ -120,6 +120,13 @@ color. Diet legend sits under the population graph (legend_y=846); labels "Фо�
   labels (`tr()`), colors in `_SEASON_COLOR`.
 - Line colors use `diet_color(diet, cls)` (matches cell colors) via `cls_diet` map;
   YEL line = total.
+- **Legend / palette (under the graph)**: three diet-group dots + a Total dot act as
+  on/off toggles for all lines of that diet (and for the total). A scrollable row of
+  per-class color dots below them lets you toggle individual classes; clicking toggles,
+  mouse wheel over the palette scrolls. `PopulationGraph` tracks `cls_visible`
+  (per-class) and `show_total`; `toggle_cls`/`toggle_diet`/`toggle_total` flip them;
+  `draw()` skips hidden lines.
+
 
 ### Sound system
 10 MP3 files in `src/sounds/`: eating, divide, death, mutation, lvl_up, lvl_down, heartbeat, gurgle, gurgle2, injection.
@@ -129,6 +136,9 @@ color. Diet legend sits under the population graph (legend_y=846); labels "Фо�
 - Level-up at 60% energy (`LEVEL_UP_THRESHOLD=0.60`), drops to 20%.
 - Mass: level 0=2.0, level 10=8.0 (`LEVEL_MASS_STEP=0.6`).
 - Level-10 ZOOP elites divide without energy drain.
+
+### Heartbeat sound
+- Selected cells with energy below 30% of max play a heartbeat sound every ~60 ticks.
 
 ### Genome class (`genome.py`)
 `Genome` uses `__slots__` (17 slots), NOT a dataclass. Values clamped in `__init__`. `clone_mutate()` does ±15% random perturbation per gene.

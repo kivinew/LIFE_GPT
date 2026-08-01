@@ -1,24 +1,24 @@
 [
   {
-    "x": 919.433142890585,
-    "y": 571.0859657629651,
-    "energy": 53.02609882421058,
-    "level": 7,
-    "age": 3075,
+    "x": 541.962287646027,
+    "y": 639.5654597918519,
+    "energy": 10.501378038129372,
+    "level": 6,
+    "age": 6,
     "genes": {
-      "speed": 1.5,
-      "sense": 40.0,
-      "mass": 4.457539760937498,
-      "metabolism": 0.02,
-      "mut_rate": 0.08,
+      "speed": 3.3547651357822637,
+      "sense": 120.0,
+      "mass": 5.6,
+      "metabolism": 0.019797831108970838,
+      "mut_rate": 0.08644726519373436,
       "major_mut_rate": 0.1,
       "divide_chance": 0.5,
       "diet": 0,
-      "interact": 0.5,
-      "dmg_phot": 0.6,
+      "interact": 0.8621472231480228,
+      "dmg_phot": 0.6752014667991363,
       "dmg_zoop": 1.2,
-      "dmg_poly": 1.0,
-      "lifespan_ticks": 3636
+      "dmg_poly": 1.014908958471514,
+      "lifespan_ticks": 6313
     }
   }
 ]

@@ -188,11 +188,44 @@ class PopulationGraph:
         self.sample_interval = sample_interval
         self.history = deque()  # of (tick, counts)
         self.cls_diet = {}  # cls -> diet, to color lines like the cells
+        # Per-class visibility (default: visible). Populated lazily in update()/draw().
+        self.cls_visible = {}
+        # Toggle for the aggregated "total" line.
+        self.show_total = True
+        # Vertical scroll offset (index) for the legend palette of classes.
+        self.legend_offset = 0
         self._next_sample = 0
+
+    def _ensure_cls(self, cls):
+        if cls not in self.cls_visible:
+            self.cls_visible[cls] = True
 
     def _class_color(self, cls):
         seed = cls if isinstance(cls, int) else abs(hash(cls)) % 1000
         return diet_color(self.cls_diet.get(cls, 0), seed)
+
+    def toggle_cls(self, cls):
+        self.cls_visible[cls] = not self.cls_visible.get(cls, True)
+
+    def toggle_diet(self, diet):
+        """Toggle visibility of every class whose diet matches."""
+        changed = False
+        for cls, dd in self.cls_diet.items():
+            if dd == diet:
+                self.cls_visible[cls] = not self.cls_visible.get(cls, True)
+                changed = True
+        return changed
+
+    def toggle_total(self):
+        self.show_total = not self.show_total
+
+    def legend_entries(self):
+        """Return (cls, color, visible) for every known class, sorted by cls."""
+        out = []
+        for cls in sorted(self.cls_diet.keys(), key=lambda k: (str(k))):
+            self._ensure_cls(cls)
+            out.append((cls, self._class_color(cls), self.cls_visible[cls]))
+        return out
 
     def update(self, tick, cells):
         """Call each tick to record the current population counts per class."""
@@ -205,6 +238,7 @@ class PopulationGraph:
                 cls = c.cls
                 counts[cls] = counts.get(cls, 0) + 1
                 self.cls_diet[cls] = c.genome.diet
+                self._ensure_cls(cls)
         self.history.append((tick, counts))
         while (
             len(self.history) > 2 and (tick - self.history[0][0]) > self.history_length
@@ -257,6 +291,8 @@ class PopulationGraph:
             for val in frame.values():
                 if val > max_count:
                     max_count = val
+            for cls in frame.keys():
+                self._ensure_cls(cls)
         if max_count == 0:
             max_count = 1  # avoid division by zero
 
@@ -268,6 +304,8 @@ class PopulationGraph:
 
         # Draw one line per cell class, colors matching cell colors
         for cls in sorted(classes, key=lambda k: str(k)):
+            if not self.cls_visible.get(cls, True):
+                continue  # toggled off in the legend
             color = self._class_color(cls)
             points = [
                 (px_x(tick), scale_y(frame.get(cls, 0))) for tick, frame in history_list
@@ -279,16 +317,8 @@ class PopulationGraph:
         total_points = [
             (px_x(tick), scale_y(sum(frame.values()))) for tick, frame in history_list
         ]
-        if len(total_points) > 1:
+        if self.show_total and len(total_points) > 1:
             pygame.draw.lines(surf, YEL, False, total_points, 2)
-
-        # Legend: total only
-        legend_x = x + width - 70
-        legend_y = y + 5
-        pygame.draw.rect(surf, YEL, (legend_x, legend_y, 15, 15))
-        font = pygame.font.SysFont(None, 18)
-        text = font.render("Total", True, WHITE)
-        surf.blit(text, (legend_x + 20, legend_y))
 
         # Draw axes
         # X axis

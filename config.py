@@ -13,6 +13,7 @@ YEL = (255, 220, 80)
 CYAN = (100, 200, 255)
 GREEN = (80, 255, 100)
 RED = (220, 60, 60)
+LEVEL_COLOR = (255, 200, 60)
 TEAL = (150, 180, 100)
 
 # ── Cell diet types ──────────────────────────────────────────────
@@ -245,12 +246,14 @@ L10N = {
         "hotkey_x": "X — мутировать",
         "hotkey_d": "D — удалить",
         "hotkey_l": "L — язык",
-        "hotkey_m": "M — миникарта",
+        "hotkey_m": "M — громкость музыки, Alt+M — звуки",
         "hotkey_tab": "Tab — панель инфо",
         "hotkey_z": "Z — зум к клетке",
         "hotkey_b": "B — следование за клеткой",
         "follow": "Следование: {}",
         "population_graph": "Популяция по видам",
+        "classes": "Классы:",
+        "total": "Итого",
         "spring": "Весна",
         "summer": "Лето",
         "autumn": "Осень",
@@ -320,12 +323,14 @@ L10N = {
         "hotkey_x": "X — mutate",
         "hotkey_d": "D — delete",
         "hotkey_l": "L — language",
-        "hotkey_m": "M — mini-map",
+        "hotkey_m": "M — music volume, Alt+M — SFX",
         "hotkey_tab": "Tab — info panel",
         "hotkey_z": "Z — zoom to cell",
         "hotkey_b": "B — follow cell",
         "follow": "Follow: {}",
         "population_graph": "Population by species",
+        "classes": "Classes:",
+        "total": "Total",
         "spring": "Spring",
         "summer": "Summer",
         "autumn": "Autumn",

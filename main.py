@@ -222,6 +222,80 @@ def _select_in_rect(cells, wx0, wy0, wx1, wy1, shift):
     return sel
 
 
+# ── Population-graph legend / palette toggles ─────────────────────────────
+LEGEND_GROUP_Y = 846
+_LEGEND_GRID_Y = LEGEND_GROUP_Y + 26
+LEGEND_GRID_RECT = pygame.Rect(COL_LX, _LEGEND_GRID_Y, COL_W, 22)
+_LEGEND_DOT_R = 10
+_LEGEND_CLASS_R = 6
+
+
+def _palette_group_dots():
+    """Return [(kind, cx, cy, rect)] for the diet group dots + the Total dot."""
+    xs = [COL_LX + 36, COL_LX + 118, COL_LX + 200, COL_LX + COL_W - 36]
+    kinds = [PHOT, ZOOP, POLY, "total"]
+    out = []
+    for kind, cx in zip(kinds, xs):
+        out.append(
+            (
+                kind,
+                cx,
+                LEGEND_GROUP_Y,
+                pygame.Rect(
+                    cx - _LEGEND_DOT_R,
+                    LEGEND_GROUP_Y - _LEGEND_DOT_R,
+                    _LEGEND_DOT_R * 2,
+                    _LEGEND_DOT_R * 2,
+                ),
+            )
+        )
+    return out
+
+
+def _palette_class_grid(pop_graph, dot_r=_LEGEND_CLASS_R, gap=8):
+    """Return (entries, offset, total) for the visible scroll window of classes.
+
+    entries = list of (cls, rect, color, visible).
+    """
+    cols = max(1, (LEGEND_GRID_RECT.w - 2 * gap) // (2 * dot_r + gap))
+    rows = max(1, LEGEND_GRID_RECT.h // (2 * dot_r + gap))
+    entries = pop_graph.legend_entries()
+    total = len(entries)
+    per_page = cols * rows if total else 1
+    offset = max(0, min(pop_graph.legend_offset, max(0, total - per_page)))
+    page = entries[offset : offset + per_page]
+    out = []
+    for i, (cls, color, visible) in enumerate(page):
+        col, row = i % cols, i // cols
+        cx = LEGEND_GRID_RECT.x + gap + col * (2 * dot_r + gap) + dot_r
+        cy = LEGEND_GRID_RECT.y + gap + row * (2 * dot_r + gap) + dot_r
+        out.append(
+            (
+                cls,
+                pygame.Rect(cx - dot_r, cy - dot_r, 2 * dot_r, 2 * dot_r),
+                color,
+                visible,
+            )
+        )
+    return out, offset, total
+
+
+def _palette_click(pop_graph, pos):
+    """Handle a click on the legend/palette. Returns True if consumed."""
+    for kind, cx, cy, rect in _palette_group_dots():
+        if rect.collidepoint(pos):
+            if kind == "total":
+                pop_graph.toggle_total()
+            else:
+                pop_graph.toggle_diet(kind)
+            return True
+    for cls, rect, color, visible in _palette_class_grid(pop_graph)[0]:
+        if rect.collidepoint(pos):
+            pop_graph.toggle_cls(cls)
+            return True
+    return False
+
+
 # ═══════════════════════════════════════════════════════════════════════
 def eat_corpses(cells, corpses, dt):
     """POLY cells near a corpse consume it: corpse mass shrinks, eater gains energy."""
@@ -486,18 +560,35 @@ def main():
             if e.type == pygame.KEYDOWN:
                 handle_key(e, st)
 
-            # ── Mouse wheel zoom ──────────────────────────────────────
+            # ── Mouse wheel: palette scroll or camera zoom ──────────────────
             if e.type == pygame.MOUSEWHEEL:
-                old_zoom = zoom
-                new_zoom = max(0.3, min(3.0, zoom * (1.0 + e.y * 0.15)))
-                if new_zoom != old_zoom:
-                    pmx, pmy = pygame.mouse.get_pos()
-                    wx = (pmx - (W - SB) / 2) / old_zoom + cam_x
-                    wy = (pmy - H / 2) / old_zoom + cam_y
-                    zoom = new_zoom
-                    cam_x = wx - (pmx - (W - SB) / 2) / zoom
-                    cam_y = wy - (pmy - H / 2) / zoom
-                    st.cam_x, st.cam_y, st.zoom = cam_x, cam_y, zoom
+                pmx, pmy = pygame.mouse.get_pos()
+                over_palette = LEGEND_GRID_RECT.collidepoint(pmx, pmy) or any(
+                    r.collidepoint(pmx, pmy) for *_, r in _palette_group_dots()
+                )
+                if over_palette:
+                    total = len(pop_graph.legend_entries())
+                    _, _, per_page = _palette_class_grid(pop_graph)
+                    if total > per_page:
+                        step = 5
+                        pop_graph.legend_offset = max(
+                            0,
+                            min(
+                                pop_graph.legend_offset - e.y * step,
+                                max(0, total - per_page),
+                            ),
+                        )
+                else:
+                    old_zoom = zoom
+                    new_zoom = max(0.3, min(3.0, zoom * (1.0 + e.y * 0.15)))
+                    if new_zoom != old_zoom:
+                        pmx, pmy = pygame.mouse.get_pos()
+                        wx = (pmx - (W - SB) / 2) / old_zoom + cam_x
+                        wy = (pmy - H / 2) / old_zoom + cam_y
+                        zoom = new_zoom
+                        cam_x = wx - (pmx - (W - SB) / 2) / zoom
+                        cam_y = wy - (pmy - H / 2) / zoom
+                        st.cam_x, st.cam_y, st.zoom = cam_x, cam_y, zoom
 
             # ── Mini-map mouse control ────────────────────────────────
             if (
@@ -583,6 +674,10 @@ def main():
             if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
                 shift = bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
                 alt = bool(pygame.key.get_mods() & pygame.KMOD_ALT)
+                # Legend/palette clicks take priority over world clicks
+                if _palette_click(pop_graph, e.pos):
+                    st.sel_cell = sel_cell
+                    continue
                 in_world = wx < W - SB and not map_rect.collidepoint(e.pos)
 
                 hit = _pick_cell(cells, wx, wy, zoom) if in_world else None
@@ -876,15 +971,15 @@ def main():
             lines = [
                 f"{tr('selected')}:",
                 f"  {tr('energy')}: {sel_cell.energy:.1f} / {sel_cell.max_energy:.1f}",
-                f"  {tr('level')}: {sel_cell.level}",
-                f"  {tr('age')}: {sel_cell.age}",
-                f"  {tr('speed')}: {sel_cell.genome.speed:.2f}",
-                f"  {tr('sense')}: {sel_cell.genome.sense:.0f}",
-                f"  {tr('mass')}: {sel_cell.genome.mass:.2f}",
-                f"  {tr('metabolism')}: {sel_cell.genome.metabolism:.3f}",
+                f"  {tr('level')}: {sel_cell.level} / {MAX_LEVEL}",
+                f"  {tr('age')}: {sel_cell.age} / {sel_cell.genome.lifespan_ticks}",
+                f"  {tr('speed')}: {sel_cell.genome.speed:.2f} / {sliders[0].mx:.2f}",
+                f"  {tr('sense')}: {sel_cell.genome.sense:.0f} / {sliders[1].mx:.0f}",
+                f"  {tr('mass')}: {sel_cell.genome.mass:.2f} / {sliders[2].mx:.2f}",
+                f"  {tr('metabolism')}: {sel_cell.genome.metabolism:.3f} / {sliders[3].mx:.3f}",
                 f"  {tr('diet')}: {tr_diet(sel_cell.genome.diet)}",
-                f"  {tr('interact')}: {sel_cell.genome.interact:.2f}",
-                f"  {tr('divide_chance')}: {sel_cell.genome.divide_chance:.2f}",
+                f"  {tr('interact')}: {sel_cell.genome.interact:.2f} / {sl_interact.mx:.2f}",
+                f"  {tr('divide_chance')}: {sel_cell.genome.divide_chance:.2f} / {sliders[4].mx:.2f}",
             ]
             for i, line in enumerate(lines):
                 surf = font.render(line, True, WHITE)
@@ -917,17 +1012,50 @@ def main():
                 surf = small.render(hk, True, WHITE)
                 screen.blit(surf, (COL_RX + 5, panel_y + 28 + i * 16))
 
-        # ── UI: Legend (sidebar, under the graph) ────────────────────────
-        legend_y = 846
-        legend_items = [
-            (PHOT, tr("diet_phot"), diet_color(PHOT, 10)),
-            (ZOOP, tr("diet_zoop"), diet_color(ZOOP, 10)),
-            (POLY, tr("diet_poly"), diet_color(POLY, 10)),
-        ]
-        for i, (dtype, label, color) in enumerate(legend_items):
-            pygame.draw.circle(screen, color, (COL_LX + 25 + i * 95, legend_y), 10)
+        # ── UI: Legend / palette (under the population graph) ─────────────────
+        # Diet-group toggles + Total toggle
+        group_labels = {
+            PHOT: tr("diet_phot"),
+            ZOOP: tr("diet_zoop"),
+            POLY: tr("diet_poly"),
+        }
+        for kind, cx, cy, rect in _palette_group_dots():
+            if kind == "total":
+                color = YEL
+                label = tr("total")
+                active = pop_graph.show_total
+                if active:
+                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
+                else:
+                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R, 1)
+                    r = _LEGEND_DOT_R - 3
+                    pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 2)
+                    pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 2)
+            else:
+                color = diet_color(kind, 10)
+                label = group_labels[kind]
+                pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
             surf = tiny.render(label, True, WHITE)
-            screen.blit(surf, (COL_LX + 12 + i * 95, legend_y + 14))
+            screen.blit(surf, (cx - surf.get_width() // 2, cy + 14))
+        # Scrollable per-class palette
+        classes = _palette_class_grid(pop_graph)
+        _, offset, total = classes
+        for cls, rect, color, visible in classes[0]:
+            if visible:
+                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R)
+            else:
+                # hollow + cross
+                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R, 1)
+                r = _LEGEND_CLASS_R - 2
+                cx, cy = rect.center
+                pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 1)
+                pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 1)
+        if total > 0:
+            label = f"{tr('classes')}: {offset + 1}-{min(offset + len(classes[0]), total)} / {total}"
+            ts = tiny.render(label, True, WHITE)
+            screen.blit(
+                ts, (LEGEND_GRID_RECT.x, LEGEND_GRID_RECT.y + LEGEND_GRID_RECT.h + 2)
+            )
 
         # ── UI: Stats (top-left) ─────────────────────────────────────────
         if show_stats:
