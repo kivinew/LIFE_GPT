@@ -426,8 +426,8 @@ def main():
     sl_temp._bias = 0.0
     sl_diffuse = Slider(COL_LX, 597, COL_W, tr("food_diffuse"), 0.005, 0.2, 0.06)
     sl_time = Slider(COL_LX, 627, COL_W, tr("time_scale"), 0.1, 5.0, 1.0)
-    sl_sfx = Slider(COL_LX, 662, COL_W, tr("sfx"), 0.0, 1.0, 0.1)
-    sl_music = Slider(COL_LX, 697, COL_W, tr("music"), 0.0, 1.0, 0.8)
+    sl_sfx = Slider(COL_RX, 726, COL_W, tr("sfx"), 0.0, 1.0, 0.1)
+    sl_music = Slider(COL_RX, 766, COL_W, tr("music"), 0.0, 1.0, 0.8)
 
     # Load background music from base64.txt
     try:
@@ -947,7 +947,7 @@ def main():
 
         draw_block(68, 286, tr("genes"))
         draw_block(356, 98, tr("damage"))
-        draw_block(456, 263, tr("environment"))
+        draw_block(456, 185, tr("environment"))
 
         # ── UI: Sliders & labels ─────────────────────────────────────────
         for s in sliders:
@@ -1012,50 +1012,6 @@ def main():
                 surf = small.render(hk, True, WHITE)
                 screen.blit(surf, (COL_RX + 5, panel_y + 28 + i * 16))
 
-        # ── UI: Legend / palette (under the population graph) ─────────────────
-        # Diet-group toggles + Total toggle
-        group_labels = {
-            PHOT: tr("diet_phot"),
-            ZOOP: tr("diet_zoop"),
-            POLY: tr("diet_poly"),
-        }
-        for kind, cx, cy, rect in _palette_group_dots():
-            if kind == "total":
-                color = YEL
-                label = tr("total")
-                active = pop_graph.show_total
-                if active:
-                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
-                else:
-                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R, 1)
-                    r = _LEGEND_DOT_R - 3
-                    pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 2)
-                    pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 2)
-            else:
-                color = diet_color(kind, 10)
-                label = group_labels[kind]
-                pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
-            surf = tiny.render(label, True, WHITE)
-            screen.blit(surf, (cx - surf.get_width() // 2, cy + 14))
-        # Scrollable per-class palette
-        classes = _palette_class_grid(pop_graph)
-        _, offset, total = classes
-        for cls, rect, color, visible in classes[0]:
-            if visible:
-                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R)
-            else:
-                # hollow + cross
-                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R, 1)
-                r = _LEGEND_CLASS_R - 2
-                cx, cy = rect.center
-                pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 1)
-                pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 1)
-        if total > 0:
-            label = f"{tr('classes')}: {offset + 1}-{min(offset + len(classes[0]), total)} / {total}"
-            ts = tiny.render(label, True, WHITE)
-            screen.blit(
-                ts, (LEGEND_GRID_RECT.x, LEGEND_GRID_RECT.y + LEGEND_GRID_RECT.h + 2)
-            )
 
         # ── UI: Stats (top-left) ─────────────────────────────────────────
         if show_stats:
@@ -1122,11 +1078,66 @@ def main():
         pop_graph.update(tick, cells)
         pop_graph.draw(screen, COL_LX, 758, COL_W, 76)
 
+        # ── UI: Legend / palette (drawn AFTER graph so it's on top) ─────
+        group_labels = {
+            PHOT: tr("diet_phot"),
+            ZOOP: tr("diet_zoop"),
+            POLY: tr("diet_poly"),
+        }
+        for kind, cx, cy, rect in _palette_group_dots():
+            if kind == "total":
+                color = YEL
+                label = tr("total")
+                active = pop_graph.show_total
+                if active:
+                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
+                else:
+                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R, 1)
+                    r = _LEGEND_DOT_R - 3
+                    pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 2)
+                    pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 2)
+            else:
+                color = diet_color(kind, 10)
+                label = group_labels[kind]
+                diet_hidden = not any(
+                    pop_graph.cls_visible.get(c, True)
+                    for c, d in pop_graph.cls_diet.items()
+                    if d == kind
+                )
+                if diet_hidden:
+                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R, 1)
+                    r = _LEGEND_DOT_R - 3
+                    pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 2)
+                    pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 2)
+                else:
+                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
+            surf = tiny.render(label, True, WHITE)
+            screen.blit(surf, (cx - surf.get_width() // 2, cy + 14))
+        # Scrollable per-class palette
+        pal_entries, offset, total = _palette_class_grid(pop_graph)
+        for cls, rect, color, visible in pal_entries:
+            if visible:
+                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R)
+            else:
+                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R, 1)
+                r = _LEGEND_CLASS_R - 2
+                cx, cy = rect.center
+                pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 1)
+                pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 1)
+        if total > 0:
+            label = f"{tr('classes')}: {offset + 1}-{min(offset + len(pal_entries), total)} / {total}"
+            ts = tiny.render(label, True, WHITE)
+            screen.blit(
+                ts, (LEGEND_GRID_RECT.x, LEGEND_GRID_RECT.y + LEGEND_GRID_RECT.h + 2)
+            )
+
         # ── SFX / Music volume indicators ───────────────────────────────
-        sfx_text = tiny.render(f"SFX: {int(sfx_volume * 100)}%", True, WHITE)
-        screen.blit(sfx_text, (COL_RX, 720))
-        music_text = tiny.render(f"Music: {int(music_volume * 100)}%", True, WHITE)
-        screen.blit(music_text, (COL_RX, 736))
+        pygame.draw.rect(screen, GRAY, (COL_RX - 5, 696, COL_W + 10, 90), 1, 4)
+        gs_title = font.render(tr("game_settings"), True, CYAN)
+        screen.blit(
+            gs_title,
+            (COL_RX + COL_W // 2 - gs_title.get_width() // 2, 701),
+        )
 
         pygame.display.flip()
         prev_zoom = zoom

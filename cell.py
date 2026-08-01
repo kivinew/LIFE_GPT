@@ -1089,18 +1089,19 @@ class Cell:
 
         bw2 = r * 2
         max_e = self.genome.mass * self.genome.mass * DRAW_ENERGY_MASS_COEFF
-        # Level indicator (thin bar above the energy bar)
         lw = bw2 * 2
+        # Energy bar (topmost)
+        pygame.draw.rect(surf, (30, 30, 30), (x - bw2, y - r - 12, lw, 3), 0, 2)
+        if max_e > 0:
+            pw = int((self.energy / max_e) * lw)
+            cl = int(255 * max(0.0, min(1.0, self.energy / max_e)))
+            ec = (max(0, min(255, 255 - cl)), min(255, cl), 0)
+            pygame.draw.rect(surf, ec, (x - bw2, y - r - 12, pw, 3), 0, 2)
+        # Level indicator (thin bar below energy bar)
         pygame.draw.rect(surf, (40, 40, 45), (x - bw2, y - r - 9, lw, 2), 0, 1)
         lvl_w = int((self.level / MAX_LEVEL) * lw)
         if lvl_w > 0:
             pygame.draw.rect(surf, LEVEL_COLOR, (x - bw2, y - r - 9, lvl_w, 2), 0, 1)
-        pygame.draw.rect(surf, (30, 30, 30), (x - bw2, y - r - 6, bw2 * 2, 3), 0, 2)
-        if max_e > 0:
-            pw = int((self.energy / max_e) * bw2 * 2)
-            cl = int(255 * max(0.0, min(1.0, self.energy / max_e)))
-            ec = (max(0, min(255, 255 - cl)), min(255, cl), 0)
-            pygame.draw.rect(surf, ec, (x - bw2, y - r - 6, pw, 3), 0, 2)
 
         # Diet type indicator next to the energy bar
         diet_col = (

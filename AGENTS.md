@@ -97,7 +97,12 @@ COL_RX = COL_LX + COL_W + 10     # right column start: 1305
 Left column boxes (compact slider layout, label at y-12, ticks at y+11):
 - Genes: y=68, height=286 (8 sliders: speed, sense, mass, metabolism, divide_chance, diet, interact, zoophagy; 28px base / 40px labeled spacing)
 - Damage: y=356, height=98 (3 sliders: dmg_phot/zoo/poly at 374/404/434)
-- Environment: y=456, height=263 (6 sliders: regen=479, temp=519, diffuse=597, time=627, sfx=662, music=697)
+- Environment: y=456, height=185 (4 sliders: regen=479, temp=519, diffuse=597, time=627)
+
+Right column:
+- Selected cell info / hotkeys: y=68, height=350
+- Minimap: y=430, height=256
+- Game Settings: y=696, height=90 (2 sliders: sfx=726, music=766)
 
 **Slider ↔ selection binding**: speed/sense sliders are live-bound to the selected cell. Dragging
 them mutates all selected cells (via `refresh_class()`); when nothing is dragged they show the
@@ -121,11 +126,13 @@ color. Diet legend sits under the population graph (legend_y=846); labels "Фо�
 - Line colors use `diet_color(diet, cls)` (matches cell colors) via `cls_diet` map;
   YEL line = total.
 - **Legend / palette (under the graph)**: three diet-group dots + a Total dot act as
-  on/off toggles for all lines of that diet (and for the total). A scrollable row of
-  per-class color dots below them lets you toggle individual classes; clicking toggles,
-  mouse wheel over the palette scrolls. `PopulationGraph` tracks `cls_visible`
-  (per-class) and `show_total`; `toggle_cls`/`toggle_diet`/`toggle_total` flip them;
-  `draw()` skips hidden lines.
+  on/off toggles for all lines of that diet (and for the total). Diet-group dots show
+  visual feedback: filled circle = visible, hollow + red cross = hidden. A scrollable row of
+  per-class color dots below them lets you toggle individual classes (filled = visible,
+  hollow + cross = hidden); clicking toggles, mouse wheel over the palette scrolls.
+  `PopulationGraph` tracks `cls_visible` (per-class) and `show_total`;
+  `toggle_cls`/`toggle_diet`/`toggle_total` flip them; `draw()` skips hidden lines.
+  **Draw order**: palette is drawn AFTER the graph so dots are always clickable on top.
 
 
 ### Sound system
