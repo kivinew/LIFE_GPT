@@ -30,13 +30,13 @@ class HotkeyState:
         "paused",
         "add_mode",
         "time_lapse_mode",
-        "show_minimap",
         "show_stats",
         "follow_mode",
         "sel_cell",
         "running",
         "sfx_volume",
         "sfx_volume_increasing",
+        "music_volume_increasing",
         "sliders",
         "sl_diet",
         "sl_interact",
@@ -215,6 +215,20 @@ def _cycle_sfx(st):
     print(f"SFX volume: {int(st.sfx_volume * 100)}%")
 
 
+def _cycle_music(st):
+    step = 0.10
+    v = st.sl_music.val
+    if v >= 1.0:
+        st.music_volume_increasing = False
+    elif v <= 0.0:
+        st.music_volume_increasing = True
+    st.sl_music.val = max(
+        0.0, min(1.0, v + (step if st.music_volume_increasing else -step))
+    )
+    pygame.mixer.music.set_volume(st.sl_music.val)
+    print(f"Music volume: {int(st.sl_music.val * 100)}%")
+
+
 def handle_key(e, st):
     k = e.key
 
@@ -277,10 +291,10 @@ def handle_key(e, st):
     elif k == pygame.K_DOWN:
         _set_sense(st.cells, -5)
 
-    elif k == pygame.K_m and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+    elif k == pygame.K_m and (getattr(e, "mod", 0) & pygame.KMOD_ALT):
         _cycle_sfx(st)
     elif k == pygame.K_m:
-        st.show_minimap = not st.show_minimap
+        _cycle_music(st)
     elif k == pygame.K_TAB:
         st.show_stats = not st.show_stats
 

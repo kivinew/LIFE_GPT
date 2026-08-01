@@ -124,6 +124,10 @@ def play_sound(name: str):
         # Play eating sound with 200ms duration for audibility
         if name == "eating":
             _sounds[name].play(maxtime=200)
+        elif name == "divide":
+            _sounds[name].play(maxtime=150)
+        elif name == "death":
+            _sounds[name].play(maxtime=200)
         else:
             _sounds[name].play()
     except Exception:
@@ -966,6 +970,9 @@ class Cell:
             return None
 
         child_genome = self.genome.clone_mutate()
+        # Small chance of additional mutation during division
+        if random.random() < 0.05:
+            child_genome = child_genome.clone_mutate()
         child = Cell(
             self.x + random.uniform(-8, 8),
             self.y + random.uniform(-8, 8),

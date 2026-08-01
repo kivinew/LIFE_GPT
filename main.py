@@ -163,6 +163,7 @@ def process_deaths(cells, field, corpses):
                 * DECOMPOSITION_NUTRIENT_FRACTION,
             )
             corpses.append(Corpse(c.x, c.y, c.genome.mass))
+            play_sound("death")
         else:
             alive.append(c)
     if len(alive) != len(cells):
@@ -423,7 +424,6 @@ def main():
     running = True
     tick = 0
     follow_mode = False
-    show_minimap = True
     show_stats = True
     time_lapse_mode = False
 
@@ -437,13 +437,13 @@ def main():
         paused=paused,
         add_mode=add_mode,
         time_lapse_mode=time_lapse_mode,
-        show_minimap=show_minimap,
         show_stats=show_stats,
         follow_mode=follow_mode,
         sel_cell=sel_cell,
         running=running,
         sfx_volume=sfx_volume,
         sfx_volume_increasing=sfx_volume_increasing,
+        music_volume_increasing=music_volume_increasing,
         sliders=sliders,
         sl_diet=sl_diet,
         sl_interact=sl_interact,
@@ -504,7 +504,6 @@ def main():
             if (
                 e.type == pygame.MOUSEBUTTONDOWN
                 and e.button == 1
-                and show_minimap
                 and map_rect.collidepoint(e.pos)
             ):
                 map_drag = True
@@ -648,7 +647,6 @@ def main():
         paused = st.paused
         add_mode = st.add_mode
         time_lapse_mode = st.time_lapse_mode
-        show_minimap = st.show_minimap
         show_stats = st.show_stats
         follow_mode = st.follow_mode
         field = st.field
@@ -659,6 +657,7 @@ def main():
         zoom = st.zoom
         sfx_volume = st.sfx_volume
         sfx_volume_increasing = st.sfx_volume_increasing
+        music_volume_increasing = st.music_volume_increasing
 
         # Keep speed/sense sliders in sync with the selected cell (unless dragging)
         if sel_cell is not None and not sliders[0].drag and not sliders[1].drag:
@@ -943,7 +942,6 @@ def main():
                 f"{tr('zoom')}: {zoom:.2f}x",
                 f"{tr('paused')}: {'Yes' if paused else 'No'}",
                 tr("follow").format("On" if follow_mode else "Off"),
-                f"{tr('minimap')}: {'On' if show_minimap else 'Off'}",
                 f"{tr('timelapse')}: {'On' if time_lapse_mode else 'Off'}",
             ]
             for i, line in enumerate(stats):
@@ -951,47 +949,44 @@ def main():
                 screen.blit(surf, (10, 10 + i * 22))
 
         # ── UI: Mini-map (right column) ─────────────────────────────────
-        if show_minimap:
-            map_surf = pygame.Surface((map_size, map_size))
-            if hasattr(field, "_fsurf"):
-                # Downscale the field surface to show nutrient-value density
-                pygame.transform.smoothscale(
-                    field._fsurf, (map_size, map_size), map_surf
+        map_surf = pygame.Surface((map_size, map_size))
+        if hasattr(field, "_fsurf"):
+            # Downscale the field surface to show nutrient-value density
+            pygame.transform.smoothscale(field._fsurf, (map_size, map_size), map_surf)
+        else:
+            map_surf.fill((30, 30, 30))
+        for c in cells:
+            if 0 <= c.x < world_w and 0 <= c.y < world_h:
+                px = int(c.x * map_scale_x)
+                py = int(c.y * map_scale_y)
+                if c.genome.diet == PHOT:
+                    col = diet_color(PHOT, c.cls)
+                elif c.genome.diet == ZOOP:
+                    col = diet_color(ZOOP, c.cls)
+                else:
+                    col = diet_color(POLY, c.cls)
+                map_surf.set_at((px, py), col)
+        # Dead cells (corpses)
+        for cp in corpses:
+            if 0 <= cp.x < world_w and 0 <= cp.y < world_h:
+                map_surf.set_at(
+                    (int(cp.x * map_scale_x), int(cp.y * map_scale_y)),
+                    (150, 90, 90),
                 )
-            else:
-                map_surf.fill((30, 30, 30))
-            for c in cells:
-                if 0 <= c.x < world_w and 0 <= c.y < world_h:
-                    px = int(c.x * map_scale_x)
-                    py = int(c.y * map_scale_y)
-                    if c.genome.diet == PHOT:
-                        col = diet_color(PHOT, c.cls)
-                    elif c.genome.diet == ZOOP:
-                        col = diet_color(ZOOP, c.cls)
-                    else:
-                        col = diet_color(POLY, c.cls)
-                    map_surf.set_at((px, py), col)
-            # Dead cells (corpses)
-            for cp in corpses:
-                if 0 <= cp.x < world_w and 0 <= cp.y < world_h:
-                    map_surf.set_at(
-                        (int(cp.x * map_scale_x), int(cp.y * map_scale_y)),
-                        (150, 90, 90),
-                    )
-            # Camera rect
-            cam_rect = pygame.Rect(
-                int((cam_x - (W - SB) / 2 / zoom) * map_scale_x),
-                int((cam_y - H / 2 / zoom) * map_scale_y),
-                max(2, int((W - SB) / zoom * map_scale_x)),
-                max(2, int(H / zoom * map_scale_y)),
-            )
-            pygame.draw.rect(map_surf, WHITE, cam_rect, 1)
-            pygame.draw.rect(
-                screen, GRAY, (COL_RX - 5, 430, COL_W + 10, map_size + 31), 1, 4
-            )
-            mt = small.render(tr("minimap"), True, CYAN)
-            screen.blit(mt, (COL_RX + COL_W // 2 - mt.get_width() // 2, 435))
-            screen.blit(map_surf, (map_rect.x, map_rect.y))
+        # Camera rect
+        cam_rect = pygame.Rect(
+            int((cam_x - (W - SB) / 2 / zoom) * map_scale_x),
+            int((cam_y - H / 2 / zoom) * map_scale_y),
+            max(2, int((W - SB) / zoom * map_scale_x)),
+            max(2, int(H / zoom * map_scale_y)),
+        )
+        pygame.draw.rect(map_surf, WHITE, cam_rect, 1)
+        pygame.draw.rect(
+            screen, GRAY, (COL_RX - 5, 430, COL_W + 10, map_size + 31), 1, 4
+        )
+        mt = small.render(tr("minimap"), True, CYAN)
+        screen.blit(mt, (COL_RX + COL_W // 2 - mt.get_width() // 2, 435))
+        screen.blit(map_surf, (map_rect.x, map_rect.y))
 
         # ── UI: Population graph ────────────────────────────────────────
         pygame.draw.rect(screen, GRAY, (COL_LX - 5, 732, COL_W + 10, 108), 1, 4)

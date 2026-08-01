@@ -166,9 +166,9 @@ pygame.mixer.init(44100, -16, 2, 512)
 | F5 | Save to `saved_cells.json` |
 | F | Load from `saved_cells.json` |
 | L | Toggle language (ru/en) |
-| M | Toggle minimap (default on) |
+| M | Cycle music volume |
+| Alt+M | Cycle SFX volume |
 | Tab | Toggle top-left info/stats panel (default on) |
-| Ctrl+M | Cycle SFX volume |
 | Ctrl+1/2/3 | Spawn template cells |
 | Wheel | Zoom in/out around cursor (0.3x–3x, anchored at viewport center) |
 | MMB/RMB drag | Pan camera |
