@@ -499,6 +499,9 @@ def main():
     follow_mode = False
     show_stats = True
     time_lapse_mode = False
+    time_lapse_active = False
+    time_lapse_timer = 0
+    time_lapse_duration = 10  # seconds
 
     init_logging()
     pop_graph = PopulationGraph(history_length=10000, sample_interval=10)
