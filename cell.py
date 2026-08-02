@@ -910,8 +910,6 @@ class Cell:
                     other.energy += transfer
                     self.energy -= transfer
 
-    _interact_with = interact_with
-
     def take_damage(self, amount, attacker=None):
         self.energy -= amount
         if attacker and attacker.cls != self.cls:
@@ -941,8 +939,6 @@ class Cell:
         if not self.can_divide():
             return None
 
-        from genome import Genome
-
         zoo_elite = (
             self.genome.diet == ZOOP
             and self.level >= MAX_LEVEL
@@ -964,48 +960,10 @@ class Cell:
             self.y + random.uniform(-8, 8),
             child_genome,
         )
-        child.cls = self.cls
-        child.color = self.color
-
-        # Check for speciation event during division
-        if self.genome.is_new_species(child_genome):
-            # Trigger biological consequences of speciation
-            # 1. Resource competition dynamics between species
-            # New species compete for resources with parent species
-            if hasattr(self, "field"):
-                self.field.trigger_species_competition(self.cls, child.cls)
-
-            # 2. Predation strategy evolution adapting to new targets
-            # Other cells may update hunting strategies for new prey type
-            for cell in getattr(self, "_world", []):
-                if cell is not self and cell is not child and cell.energy > 0:
-                    cell.adapt_predation_strategy(child_genome.diet)
-
-            # 3. Migration pattern changes to avoid competitive pressure
-            # New species may disperse to avoid competition with parent
-            child.migration_factor = 1.5  # Increase migration tendency
-            if hasattr(self, "field"):
-                self.field.schedule_species_migration(child.cls)
-
-            # 4. Metabolic adaptation under survival competition
-            # Adapt metabolic rate for new ecological niche
-            child.genome.metabolism *= 1.1  # Slight metabolic boost
-            child.genome.metabolism = max(0.01, min(0.15, child.genome.metabolism))
-
-            # 5. Evolutionary feedback loops driving further specialization
-            # Trigger specialized evolution in response to competitive pressure
-            if hasattr(self, "field") and hasattr(self, "_world"):
-                # Record speciation event for evolutionary feedback
-                self.field.record_speciation_event(
-                    self.cls, child.cls, child_genome.diet
-                )
-
-            # Update species classification for new offspring
-            child.cls = (
-                f"species_{child_genome.diet}_"
-                f"{abs(hash(child_genome.trait_tuple())) % 1000}"
-            )
-            child.color = diet_color(child_genome.diet, random.randrange(21))
+        # Child inherits its own cls/color from refresh_class() in __init__,
+        # computed from the mutated genome. This enables natural speciation:
+        # when enough genome drift occurs, refresh_class() yields a new cls,
+        # giving the offspring a distinct appearance class.
         child.age = 0
         child.level = random.randint(0, self.level)
         child.genome.mass = LEVEL_MASS_BASE + child.level * LEVEL_MASS_STEP

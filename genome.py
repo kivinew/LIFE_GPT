@@ -7,6 +7,9 @@ from config import (
     MAJOR_SENSE_RATE,
     DIET_DEFAULT_SPEED,
     DIET_DEFAULT_SENSE,
+    PHOT,
+    ZOOP,
+    POLY,
 )
 
 
@@ -81,7 +84,7 @@ class Genome:
             se = DIET_DEFAULT_SENSE[diet if diet in (0, 1, 2) else 0]
 
         self.speed = max(0.5, min(4.0, float(s)))
-        self.sense = max(10.0, min(120.0, float(se)))
+        self.sense = max(30.0, min(120.0, float(se)))
         self.mass = max(2.0, min(8.0, float(mass)))
         self.metabolism = max(0.01, min(0.15, float(m)))
         self.mut_rate = max(0.01, min(0.3, float(mr)))
@@ -119,74 +122,73 @@ class Genome:
     def clone_mutate(self) -> "Genome":
         has_major = random.random() < self.major_mut_rate
 
-        def mut(v: float, mn: float, mx: float) -> float:
+        def drift(v, mn, mx):
+            """Minor per-gene mutation: ±15% jitter on the per-gene mut_rate roll.
+            Applied to every numeric gene uniformly — this is the continuous drift
+            that drives speciation via the hash in refresh_class()."""
             if random.random() < self.mut_rate:
-                if has_major:
-                    v *= random.uniform(0.5, 1.5)
-                else:
-                    v *= random.uniform(0.85, 1.15)
+                v *= random.uniform(0.85, 1.15)
             return max(mn, min(mx, v))
 
-        # Major mutations: ~10% chance to create new diet or sense organ
+        # A diet switch is a niche shift (PHOT<->ZOOP<POLY): the whole
+        # sensory/motor baseline reshapes to viable defaults for that role.
+        alt_diets = (PHOT, ZOOP, POLY)
+
+        def reset_to_diet(diet):
+            return DIET_DEFAULT_SPEED[diet], DIET_DEFAULT_SENSE[diet]
+
         child_diet = self.diet
-        child_sense = self.sense
+        child_speed = drift(self.speed, 0.5, 4.0)
+        child_sense = drift(self.sense, 30.0, 120.0)
+
         if has_major:
-            # Major mutations can create new diets or sense organs (but not both)
-            # Each has ~50% chance - use both constants for independent decisions
+            # A major mutation is a single, coherent evolutionary leap — either
+            # an ecological shift (diet) or a sensory re-org, never both at once.
             diet_change = random.random() < MAJOR_DIET_RATE
             sense_change = random.random() < MAJOR_SENSE_RATE
-
-            # Ensure we don't change both diet and sense (excluded combinations)
             if diet_change and sense_change:
-                # Randomly choose one to avoid changing both
                 if random.random() < 0.5:
                     diet_change = False
                 else:
                     sense_change = False
 
             if diet_change:
-                child_diet = random.choice([0, 1, 2])
-                # Sense reset to base when diet changes
-                child_sense = 10.0
+                child_diet = random.choice([d for d in alt_diets if d != self.diet])
+                child_speed, child_sense = reset_to_diet(child_diet)
             elif sense_change:
-                # Sense progression: 0 (none) -> 1 -> 2 (full)
-                current_level = (
-                    child_sense / 120.0
-                )  # 0.0 = 10, 0.083 = 10~20, 1.0 = 120
-                if current_level < 0.5:  # If sense level 0 or basic (0-60)
-                    child_sense = random.choice(
-                        [10.0, 60.0]
-                    )  # Jump to 0 (disabled) or 1 (basic)
-                elif current_level < 1.0:  # If sense level intermediate (60-120)
-                    child_sense = 120.0  # Jump to full (2)
-                else:
-                    child_sense = current_level  # Keep same if already at max
+                # Evolve / lose a sense organ: a big jump along the perception axis.
+                child_sense = min(120.0, child_sense * random.uniform(1.5, 2.0))
         else:
-            # Minor mutations: random diet change with smaller probability
+            # Minor path: rare diet drift. A niche tweak still reshapes the speed/sense
+            # baseline (no half-viable hybrid phenotypes: a photosynthetic body plan
+            # with a predator's speed, or vice-versa, is inviable).
             if random.random() < self.mut_rate * 0.5:
-                child_diet = random.choice([0, 1, 2])
+                alt = [d for d in alt_diets if d != self.diet]
+                if alt:
+                    child_diet = random.choice(alt)
+                    child_speed, child_sense = reset_to_diet(child_diet)
 
         child_lifespan = int(self.lifespan_ticks * random.uniform(0.80, 1.20))
 
         return Genome(
-            speed=mut(self.speed, 0.5, 4.0),
-            sense=mut(self.sense, 10.0, 120.0),
-            metabolism=mut(self.metabolism, 0.005, 0.15),
-            mut_rate=mut(self.mut_rate, 0.005, 0.3),
-            major_mut_rate=mut(self.major_mut_rate, 0.0, 0.1),
+            speed=child_speed,
+            sense=child_sense,
+            metabolism=drift(self.metabolism, 0.005, 0.15),
+            mut_rate=drift(self.mut_rate, 0.005, 0.3),
+            major_mut_rate=drift(self.major_mut_rate, 0.0, 0.1),
             diet=child_diet,
-            interact=mut(self.interact, 0.01, 1.0),
-            divide_chance=mut(self.divide_chance, 0.05, 0.95),
-            mass=mut(self.mass, 1.5, 8.0),
-            dmg_phot=mut(self.dmg_phot, 0.05, 3.0),
-            dmg_zoop=mut(self.dmg_zoop, 0.05, 3.0),
-            dmg_poly=mut(self.dmg_poly, 0.05, 3.0),
+            interact=drift(self.interact, 0.01, 1.0),
+            divide_chance=drift(self.divide_chance, 0.05, 0.95),
+            mass=drift(self.mass, 1.5, 8.0),
+            dmg_phot=drift(self.dmg_phot, 0.05, 3.0),
+            dmg_zoop=drift(self.dmg_zoop, 0.05, 3.0),
+            dmg_poly=drift(self.dmg_poly, 0.05, 3.0),
             lifespan_ticks=child_lifespan,
-            learning_rate=mut(self.learning_rate, 0.001, 0.2),
-            memory_size=int(self.memory_size * random.uniform(0.8, 1.2)),
-            herd_tendency=mut(self.herd_tendency, 0.0, 1.0),
-            cautious=mut(self.cautious, 0.0, 1.0),
-            epigenetics=mut(self.epigenetics, 0.0, 1.0),
+            learning_rate=drift(self.learning_rate, 0.001, 0.2),
+            memory_size=max(5, min(50, int(self.memory_size * random.uniform(0.8, 1.2)))),
+            herd_tendency=drift(self.herd_tendency, 0.0, 1.0),
+            cautious=drift(self.cautious, 0.0, 1.0),
+            epigenetics=drift(self.epigenetics, 0.0, 1.0),
         )
 
     def trait_tuple(self) -> Tuple[float, ...]:
@@ -201,67 +203,6 @@ class Genome:
             round(self.epigenetics, 3),
         )
 
-    def apply_epigenetic_modulation(self, environment_factor: float = 1.0) -> "Genome":
-        """
-        Apply epigenetic modulation - temporary gene expression changes.
-        The epigenetics trait (0.0-1.0) represents the level of heritable expression
-        changes that modify phenotype without changing DNA sequence.
-
-        Args:
-            environment_factor: Multiplier from environmental conditions (0.5-2.0)
-
-        Returns:
-            New Genome instance with modulated traits based on epigenetics
-        """
-        # Epigenetic influence scales traits based on environment
-        # Higher epigenetics = more pronounced environmental response
-        modulation = 1.0 + (self.epigenetics * (environment_factor - 1.0) * 0.5)
-
-        return Genome(
-            speed=mut(self.speed * modulation, 0.5, 4.0),
-            sense=mut(self.sense * modulation, 10.0, 120.0),
-            metabolism=mut(self.metabolism * modulation, 0.005, 0.15),
-            mut_rate=mut(self.mut_rate, 0.005, 0.3),
-            major_mut_rate=mut(self.major_mut_rate, 0.0, 0.1),
-            diet=self.diet,  # Diet remains fixed, epigenetics affects expression
-            interact=mut(self.interact * modulation, 0.01, 1.0),
-            divide_chance=mut(self.divide_chance, 0.05, 0.95),
-            mass=mut(self.mass, 1.5, 8.0),
-            dmg_phot=mut(self.dmg_phot, 0.05, 3.0),
-            dmg_zoop=mut(self.dmg_zoop, 0.05, 3.0),
-            dmg_poly=mut(self.dmg_poly, 0.05, 3.0),
-            lifespan_ticks=self.lifespan_ticks,
-            learning_rate=mut(self.learning_rate, 0.001, 0.2),
-            memory_size=int(self.memory_size * random.uniform(0.8, 1.2)),
-            herd_tendency=mut(self.herd_tendency, 0.0, 1.0),
-            cautious=mut(self.cautious, 0.0, 1.0),
-            epigenetics=mut(self.epigenetics * 0.95, 0.0, 1.0),  # Decay over time
-        )
-
-    def reset_epigenetics(self) -> "Genome":
-        """Reset epigenetics to baseline (0.0) without passing through environment."""
-        # Create new genome with baseline epigenetics
-        return Genome(
-            speed=self.speed,
-            sense=self.sense,
-            metabolism=self.metabolism,
-            mut_rate=self.mut_rate,
-            major_mut_rate=self.major_mut_rate,
-            diet=self.diet,
-            interact=self.interact,
-            divide_chance=self.divide_chance,
-            mass=self.mass,
-            dmg_phot=self.dmg_phot,
-            dmg_zoop=self.dmg_zoop,
-            dmg_poly=self.dmg_poly,
-            lifespan_ticks=self.lifespan_ticks,
-            learning_rate=self.learning_rate,
-            memory_size=self.memory_size,
-            herd_tendency=self.herd_tendency,
-            cautious=self.cautious,
-            epigenetics=0.0,  # Reset to baseline
-        )
-
     def genetic_distance(self, other_genome) -> float:
         """Calculate genetic distance between this and another genome.
 
@@ -272,7 +213,7 @@ class Genome:
         # Traits with their max/min ranges for normalization
         trait_ranges = {
             "speed": (0.5, 4.0),
-            "sense": (10.0, 120.0),
+            "sense": (30.0, 120.0),
             "mass": (2.0, 8.0),
             "metabolism": (0.01, 0.15),
             "mut_rate": (0.01, 0.3),

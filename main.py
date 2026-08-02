@@ -367,7 +367,7 @@ def main():
     # ── UI widgets ─────────────────────────────────────────────────────
     sliders = [
         Slider(COL_LX, 96, COL_W, tr("speed"), 0.5, 4.0, 1.5),
-        Slider(COL_LX, 124, COL_W, tr("sense"), 10, 120, 40),
+        Slider(COL_LX, 124, COL_W, tr("sense"), 30, 120, 40),
         Slider(COL_LX, 152, COL_W, tr("mass"), 2, 8, 4),
         Slider(COL_LX, 180, COL_W, tr("metabolism"), 0.01, 0.15, 0.04),
         Slider(COL_LX, 208, COL_W, tr("divide_chance"), 0.1, 0.9, 0.5),
@@ -457,14 +457,14 @@ def main():
     # Music volume cycling state
     music_volume = 0.25
     music_volume_step = 0.25
-    music_volume_increasing = True
+    music_volume_increasing = False
     pygame.mixer.music.set_volume(music_volume)
     sl_music.val = music_volume
 
     # SFX volume cycling state (like music, but for sound effects)
     sfx_volume = sl_sfx.val
     sfx_volume_step = 0.10
-    sfx_volume_increasing = True
+    sfx_volume_increasing = False
     import cell
 
     cell._sfx_volume = sfx_volume
@@ -1084,7 +1084,6 @@ def main():
             stats = [
                 f"{tr('cells')}: {len(cells)}/{MAX_CELLS} ({tr('dead')}: {len(corpses)})",
                 f"{tr('tick')}: {tick}",
-                f"{tr('fps')}: {clock.get_fps():.0f}",
                 f"{tr('season')}: {tr(season_name)}",
                 f"{tr('temp')}: {-10.0 + field.temperature * 45.0:.1f}°C",
                 f"{tr('zoom')}: {zoom:.2f}x",
@@ -1223,6 +1222,11 @@ def main():
             gs_title,
             (COL_RX + COL_W // 2 - gs_title.get_width() // 2, 701),
         )
+
+        # ── UI: FPS (bottom-right corner) ────────────────────────────────
+        fps_text = f"FPS: {clock.get_fps():.0f}"
+        fps_surf = font.render(fps_text, True, WHITE)
+        screen.blit(fps_surf, (W - fps_surf.get_width() - 10, H - 24))
 
         pygame.display.flip()
         prev_zoom = zoom

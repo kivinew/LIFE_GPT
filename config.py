@@ -24,7 +24,7 @@ POLY = 2
 # Default speed/sense per diet class (PHOT min, POLY mid, ZOOP max)
 # Used by Genome when speed/sense are not specified explicitly.
 DIET_DEFAULT_SPEED = {PHOT: 0.5, ZOOP: 4.0, POLY: 2.0}
-DIET_DEFAULT_SENSE = {PHOT: 10.0, ZOOP: 120.0, POLY: 65.0}
+DIET_DEFAULT_SENSE = {PHOT: 30.0, ZOOP: 120.0, POLY: 65.0}
 
 # ── Energy coefficients ──────────────────────────────────────────
 ENERGY_MASS_COEFF = 4.5  # Was 5.5 — reduced to prevent cells living too long

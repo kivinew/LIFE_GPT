@@ -151,7 +151,7 @@ def _set_speed(cells, delta):
 def _set_sense(cells, delta):
     for c in cells:
         if c.selected:
-            c.genome.sense = min(120, max(10, c.genome.sense + delta))
+            c.genome.sense = min(120, max(30, c.genome.sense + delta))
             c.refresh_class()
 
 
