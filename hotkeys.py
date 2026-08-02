@@ -312,7 +312,7 @@ def handle_key(e, st):
             if st.follow_mode:
                 st.cam_x = st.sel_cell.x
                 st.cam_y = st.sel_cell.y
-    elif k == pygame.K_F:
+    elif k == pygame.K_f:
         st.follow_mode = False
         if st.sel_cell is not None:
             st.cam_x, st.cam_y = st.sel_cell.x, st.sel_cell.y
