@@ -874,11 +874,72 @@ def main():
             # ── Camera follows the selected cell ─────────────────────
             if follow_mode and sel_cell is not None:
                 if sel_cell in cells:
-                    cam_x, cam_y = sel_cell.x, sel_cell.y
+                    # Smooth camera following with interpolation for fluid motion
+                    # Target position is the selected cell
+                    target_cam_x, target_cam_y = sel_cell.x, sel_cell.y
+
+                    # Calculate current camera position relative to world coordinates
+                    # Current camera position is already in world coordinates (cam_x, cam_y)
+                    # Calculate smooth interpolation factor (0.1 for smooth follow)
+                    follow_speed = 0.15
+
+                    # Interpolate camera position toward target
+                    new_cam_x = cam_x + (target_cam_x - cam_x) * follow_speed
+                    new_cam_y = cam_y + (target_cam_y - cam_y) * follow_speed
+
+                    # Update camera position
+                    cam_x, cam_y = new_cam_x, new_cam_y
                     st.cam_x, st.cam_y = cam_x, cam_y
                 else:
                     follow_mode = False
                     st.follow_mode = False
+
+            # ── Time-lapse recording (DEV_PLAN Phase 3.1) ─────────────────────────────────
+            if time_lapse_active:
+                # Capture a frame
+                frame_surface = pygame.Surface((W - SB, H))
+                frame_surface.fill(BG)
+
+                # Draw the scene
+                field.draw(frame_surface)
+                for cp in corpses:
+                    if -50 < cp.x < W - SB + 50 and -50 < cp.y < H + 50:
+                        cp.draw_at(frame_surface, cp.x, cp.y)
+                for c in cells:
+                    if -50 < c.x < W - SB + 50 and -50 < c.y < H + 50:
+                        c.draw_at(frame_surface, c.x, c.y)
+
+                # Draw UI elements
+                pygame.draw.rect(frame_surface, DARK, (W - SB, 0, SB, H))
+                title_surf = big.render("LIFE_GPT", True, CYAN)
+                frame_surface.blit(title_surf, (W - SB + (SB - title_surf.get_width()) // 2, 10))
+                hint_surf = small.render(tr("hint_add"), True, WHITE)
+                frame_surface.blit(hint_surf, (W - SB + (SB - hint_surf.get_width()) // 2, 40))
+
+                for s in sliders:
+                    s.draw(frame_surface, font)
+                sl_diet.draw(frame_surface, font)
+                sl_interact.draw(frame_surface, font)
+                sl_zoophagy.draw(frame_surface, font)
+                for s in sl_dmg:
+                    s.draw(frame_surface, font)
+                sl_regen.draw(frame_surface, font)
+                sl_temp.draw(frame_surface, font)
+                sl_diffuse.draw(frame_surface, font)
+                sl_time.draw(frame_surface, font)
+                sl_sfx.draw(frame_surface, font)
+                sl_music.draw(frame_surface, font)
+
+                # Save frame
+                pygame.image.save(frame_surface, f"frames/frame_{frame_count:06d}.png")
+                frame_count += 1
+
+                # Auto-stop after specified duration
+                time_lapse_timer += 1
+                if time_lapse_timer >= time_lapse_duration * 60:  # Convert minutes to ticks
+                    time_lapse_active = False
+                    st.time_lapse_active = False
+                    print(f"Time-lapse recording complete: {frame_count} frames saved")
 
         # ── Render ──────────────────────────────────────────────────────────────
         screen.fill(BG)

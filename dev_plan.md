@@ -27,7 +27,7 @@ Based on the critical discrepancy detected between DEV_PLAN.md specifications an
 ### Priority 1: Core Statistics Panel Completion (DEV_PLAN.md Compliance)
 
 #### 1.1 Follow Selected Cell (Camera Lock) - Medium Priority
-**Status**: Completely missing
+**Status**: ✅ COMPLETED
 **Implementation Hours**: 8-12 hours
 **Description**: Make camera follow selected cell with smooth transitions, lock/unlock functionality
 **Files Affected**: main.py (camera controls), ui.py (UI controls), config.py (settings)
@@ -39,6 +39,12 @@ Based on the critical discrepancy detected between DEV_PLAN.md specifications an
 **Description**: Small overview map showing cell positions, zoom support, selected cell highlighting
 **Files Affected**: main.py (drawing logic), ui.py (UI controls)
 **Dependencies**: Spatial grid knowledge (field.py, spatial.py)
+
+#### 1.3 Time-Lapse Recording - Medium Priority
+**Status**: ✅ COMPLETED
+**Implementation Hours**: 10-15 hours
+**Description**: Frame capture with video encoding, export functionality
+**Files Affected**: main.py (recording logic), utils.py (video encoding), config.py (settings)
 
 ### Priority 2: Advanced Visualization Features
 

@@ -182,6 +182,12 @@ ZOO_PHAGY_DEFAULT = 1.0  # default efficiency
 SAVE_FILE = "saved_cells.json"
 LOG_FILE = "logs/population.csv"
 
+# ── Time-lapse recording ────────────────────────────────────────
+TIME_LAPSE_DEFAULT_FPS = 30  # frames per second for time-lapse
+TIME_LAPSE_FRAMES_DIR = "frames"  # directory to save frames
+TIME_LAPSE_MAX_FRAMES = 10000  # maximum number of frames to save
+TIME_LAPSE_DURATION_MIN = 10  # default duration in minutes
+
 # ── Localization ─────────────────────────────────────────────────
 LANG = "ru"
 
