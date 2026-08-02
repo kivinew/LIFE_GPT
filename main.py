@@ -498,6 +498,7 @@ def main():
     tick = 0
     follow_mode = False
     show_stats = True
+    show_memory = False
     time_lapse_mode = False
     time_lapse_active = False
     time_lapse_timer = 0
@@ -1091,6 +1092,26 @@ def main():
                 tr("follow").format("On" if follow_mode else "Off"),
                 f"{tr('timelapse')}: {'On' if time_lapse_mode else 'Off'}",
             ]
+            # ── UI: Memory/Threat/Coop display (if show_memory enabled) ─────────────────────────
+            if show_memory and sel_cell:
+                if hasattr(sel_cell, 'memory'):
+                    mem_stats = []
+                    # Add general memory info
+                    mem_stats.append(f"Memory classes: {len(sel_cell.memory)}")
+                    # Add detailed threat/coop info for each class learned
+                    if hasattr(sel_cell.memory, 'summary'):
+                        summary = sel_cell.memory.summary()
+                        for cls, (threat, coop, encounters) in summary.items():
+                            mem_stats.append(f"  Class {cls}: Threat {threat:.2f}, Coop {coop:.2f}, Encounters {encounters}")
+                    else:
+                        mem_stats.append("  No summary method")
+                    # Display memory info
+                    for i, line in enumerate(mem_stats):
+                        surf = font.render(line, True, (200, 255, 200))
+                        screen.blit(surf, (10, 10 + (len(stats) + i) * 22))
+                else:
+                    surf = font.render("No memory for selected cell", True, (200, 200, 200))
+                    screen.blit(surf, (10, 10 + len(stats) * 22))
             for i, line in enumerate(stats):
                 surf = font.render(line, True, WHITE)
                 screen.blit(surf, (10, 10 + i * 22))

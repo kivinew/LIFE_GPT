@@ -297,6 +297,8 @@ def handle_key(e, st):
         _cycle_music(st)
     elif k == pygame.K_TAB:
         st.show_stats = not st.show_stats
+    elif k == pygame.K_m and (getattr(e, "mod", 0) & pygame.KMOD_CTRL):
+        st.show_memory = not st.show_memory
 
     elif k == pygame.K_z:
         if st.sel_cell is not None:
