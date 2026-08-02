@@ -62,35 +62,6 @@ class Slider:
                 pygame.draw.line(surf, tick_col, (lx, ly - 1), (lx, ly + 1), 1)
                 lt = font.render(self.labels[i], True, tick_col)
                 surf.blit(lt, (lx - lt.get_width() // 2, ly + 3))
-
-    def handle(self, event):
-        if (
-            event.type == pygame.MOUSEBUTTONDOWN
-            and event.button == 1
-            and self.rect.collidepoint(event.pos)
-        ):
-            self.val = max(
-                self.mn,
-                min(
-                    self.mx,
-                    self.mn
-                    + (event.pos[0] - self.rect.x) / self.rect.w * (self.mx - self.mn),
-                ),
-            )
-            self.drag = True
-        if event.type == pygame.MOUSEBUTTONUP:
-            self.drag = False
-        if event.type == pygame.MOUSEMOTION and self.drag:
-            self.val = max(
-                self.mn,
-                min(
-                    self.mx,
-                    self.mn
-                    + (event.pos[0] - self.rect.x) / self.rect.w * (self.mx - self.mn),
-                ),
-            )
-
-
 class SliderInt:
     def __init__(self, x, y, w, lab, mn, mx, val, labels=None):
         self.rect = pygame.Rect(x, y, w, 20)
@@ -131,33 +102,6 @@ class SliderInt:
                 pygame.draw.line(surf, tick_col, (lx, ly - 1), (lx, ly + 1), 1)
                 lt = font.render(self.labels[i], True, tick_col)
                 surf.blit(lt, (lx - lt.get_width() // 2, ly + 3))
-
-    def handle(self, event):
-        if (
-            event.type == pygame.MOUSEBUTTONDOWN
-            and event.button == 1
-            and self.rect.collidepoint(event.pos)
-        ):
-            n = len(self.labels) if self.labels else (self.mx - self.mn + 1)
-            idx = (
-                int((event.pos[0] - self.rect.x) / self.rect.w * (n - 1))
-                if n > 1
-                else 0
-            )
-            self.val = max(self.mn, min(self.mx, idx))
-            self.drag = True
-        if event.type == pygame.MOUSEBUTTONUP:
-            self.drag = False
-        if event.type == pygame.MOUSEMOTION and self.drag:
-            n = len(self.labels) if self.labels else (self.mx - self.mn + 1)
-            idx = (
-                int((event.pos[0] - self.rect.x) / self.rect.w * (n - 1))
-                if n > 1
-                else 0
-            )
-            self.val = max(self.mn, min(self.mx, idx))
-
-
 class Toggle:
     def __init__(self, x, y, w, h, labels, val=0):
         self.rect = pygame.Rect(x, y, w, h)
@@ -180,16 +124,6 @@ class Toggle:
                 self.rect.centery - self._cached_text.get_height() // 2,
             ),
         )
-
-    def handle(self, event):
-        if (
-            event.type == pygame.MOUSEBUTTONDOWN
-            and event.button == 1
-            and self.rect.collidepoint(event.pos)
-        ):
-            self.val = (self.val + 1) % len(self.labels)
-
-
 class PopulationGraph:
     """
     Population graph tracking counts per cell class over time (tick-based).

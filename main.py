@@ -1082,8 +1082,7 @@ def main():
         # ── UI: Stats (top-left) ─────────────────────────────────────────
         if show_stats:
             stats = [
-                f"{tr('cells')}: {len(cells)}/{MAX_CELLS}"
-                f" ({tr('alive')}: {len(cells)}, {tr('dead')}: {len(corpses)})",
+                f"{tr('cells')}: {len(cells)}/{MAX_CELLS} ({tr('dead')}: {len(corpses)})",
                 f"{tr('tick')}: {tick}",
                 f"{tr('fps')}: {clock.get_fps():.0f}",
                 f"{tr('season')}: {tr(season_name)}",
