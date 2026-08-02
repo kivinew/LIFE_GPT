@@ -5,6 +5,8 @@ import random
 import pygame
 from typing import Optional, List, Dict
 
+divisions = 0
+
 from config import (
     PHOT,
     ZOOP,
@@ -73,6 +75,7 @@ from config import (
     MAJOR_SENSE_RATE,
     DIVIDE_ENERGY_RATIO,
     DIVIDE_MIN_AGE,
+    TEMP_MUT_DEFAULT,
 )
 from spatial import get_neighbors
 from memory import CellMemory
@@ -855,7 +858,7 @@ class Cell:
         self.stress_phase()
         self._heartbeat_tick()
         self.level_phase()
-        self.divide_phase(cells, grid)
+        self.divide_phase(cells, grid, field.temperature)
         self.social_phase(cells, grid)
         self.aging_phase(dt)
         self.disease_phase(cells, grid, dt)
@@ -876,7 +879,7 @@ class Cell:
         self.stress_phase()
         self._heartbeat_tick()
         self.level_phase()
-        self.divide_phase(cells, grid)
+        self.divide_phase(cells, grid, field.temperature)
         self.social_phase(cells, grid)
         self.aging_phase(dt)
         self.disease_phase(cells, grid, dt)
@@ -934,7 +937,7 @@ class Cell:
             return False
         return True
 
-    def divide(self):
+    def divide(self, temperature=TEMP_MUT_DEFAULT):
         """Divide the cell if conditions are met. Returns child Cell or None."""
         if not self.can_divide():
             return None
@@ -951,10 +954,10 @@ class Cell:
         if child_e < self.max_energy * 0.15:
             return None
 
-        child_genome = self.genome.clone_mutate()
+        child_genome = self.genome.clone_mutate(temperature)
         # Small chance of additional mutation during division
         if random.random() < 0.05:
-            child_genome = child_genome.clone_mutate()
+            child_genome = child_genome.clone_mutate(temperature)
         child = Cell(
             self.x + random.uniform(-8, 8),
             self.y + random.uniform(-8, 8),
@@ -980,13 +983,15 @@ class Cell:
         if self.energy <= LEVEL_DOWN_THRESHOLD and self.level > 0:
             self.level -= 1
         play_sound("divide")
+        global divisions
+        divisions += 1
         return child
 
-    def divide_phase(self, cells, grid):
+    def divide_phase(self, cells, grid, temperature=TEMP_MUT_DEFAULT):
         """Attempt to divide if all conditions are met."""
         if self.energy <= 0:
             return
-        child = self.divide()
+        child = self.divide(temperature)
         if child is not None and cells is not None:
             cells.append(child)
 

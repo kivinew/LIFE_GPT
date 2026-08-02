@@ -289,7 +289,14 @@ class ResourceField:
 
         return t * multiplier
 
-    def draw(self, surf):
+    _SEASON_FOOD_COLOR = {
+        "spring": (0, 1, 0),    # green
+        "summer": (1, 1, 0),    # yellow
+        "autumn": (1, 0.5, 0),  # orange
+        "winter": (0, 0.5, 1),  # blue
+    }
+
+    def draw(self, surf, season="spring"):
         w, h = self.w, self.h
         d = self.data
 
@@ -298,9 +305,10 @@ class ResourceField:
 
         buf = pygame.surfarray.pixels3d(self._fsurf)
         g = (np.clip(d, 0.0, 1.0) * 255).astype(np.uint8)
-        buf[:, :, 0] = 0
-        buf[:, :, 1] = g
-        buf[:, :, 2] = 0
+        rc, gc, bc = self._SEASON_FOOD_COLOR.get(season, (0, 1, 0))
+        buf[:, :, 0] = (g * rc).astype(np.uint8)
+        buf[:, :, 1] = (g * gc).astype(np.uint8)
+        buf[:, :, 2] = (g * bc).astype(np.uint8)
 
         # Highlight hotspots
         for hx, hy, hv in self.hotspots:

@@ -10,6 +10,9 @@ from config import (
     PHOT,
     ZOOP,
     POLY,
+    TEMP_MUT_NEUTRAL,
+    TEMP_MUT_SWING,
+    TEMP_MUT_DEFAULT,
 )
 
 
@@ -119,19 +122,34 @@ class Genome:
     def max_energy(self) -> float:
         return self.mass * self.mass * ENERGY_MASS_COEFF
 
-    def clone_mutate(self) -> "Genome":
+    def clone_mutate(self, temperature=TEMP_MUT_DEFAULT) -> "Genome":
         has_major = random.random() < self.major_mut_rate
 
-        def drift(v, mn, mx):
-            """Minor per-gene mutation: ±15% jitter on the per-gene mut_rate roll.
-            Applied to every numeric gene uniformly — this is the continuous drift
-            that drives speciation via the hash in refresh_class()."""
-            if random.random() < self.mut_rate:
+        # Temperature biases the mutational spectrum:
+        #   cold  -> ecological (diet/niche) novelty
+        #   warm  -> motoric/sensory fine-tuning
+        # Each multiplier stays in [1 - swing, 1 + swing] (never zero), so
+        # mutation never freezes out at either extreme.
+        t = max(0.0, min(1.0, temperature))
+        norm = max(-1.0, min(1.0, 2.0 * (t - TEMP_MUT_NEUTRAL)))  # [-1,1], 0 at neutral
+        diet_mult = 1.0 - TEMP_MUT_SWING * norm  # cold up, warm down
+        other_mult = 1.0 + TEMP_MUT_SWING * norm  # warm up, cold down
+
+        # Effective per-gene rates: non-diet genes follow `other_mult`,
+        # diet-switch drift follows `diet_mult`.
+        mut_other = self.mut_rate * other_mult
+        mut_diet = self.mut_rate * diet_mult
+
+        def drift(v, mn, mx, rate=mut_other):
+            """Minor per-gene mutation: ±15% jitter on the per-gene roll.
+            Drives the continuous drift that produces speciation via the
+            hash in refresh_class()."""
+            if random.random() < rate:
                 v *= random.uniform(0.85, 1.15)
             return max(mn, min(mx, v))
 
-        # A diet switch is a niche shift (PHOT<->ZOOP<POLY): the whole
-        # sensory/motor baseline reshapes to viable defaults for that role.
+        # A diet switch is a niche shift (PHOT<->ZOOP<POLY): the sensory/motor
+        # baseline reshapes to viable defaults for that role.
         alt_diets = (PHOT, ZOOP, POLY)
 
         def reset_to_diet(diet):
@@ -142,10 +160,10 @@ class Genome:
         child_sense = drift(self.sense, 30.0, 120.0)
 
         if has_major:
-            # A major mutation is a single, coherent evolutionary leap — either
-            # an ecological shift (diet) or a sensory re-org, never both at once.
-            diet_change = random.random() < MAJOR_DIET_RATE
-            sense_change = random.random() < MAJOR_SENSE_RATE
+            # A major mutation is a single coherent evolutionary leap — either
+            # an ecological shift (diet) or a sensory re-org, never both.
+            diet_change = random.random() < MAJOR_DIET_RATE * diet_mult
+            sense_change = random.random() < MAJOR_SENSE_RATE * other_mult
             if diet_change and sense_change:
                 if random.random() < 0.5:
                     diet_change = False
@@ -156,13 +174,12 @@ class Genome:
                 child_diet = random.choice([d for d in alt_diets if d != self.diet])
                 child_speed, child_sense = reset_to_diet(child_diet)
             elif sense_change:
-                # Evolve / lose a sense organ: a big jump along the perception axis.
+                # Evolve / lose a sense organ: a big jump on the perception axis.
                 child_sense = min(120.0, child_sense * random.uniform(1.5, 2.0))
         else:
-            # Minor path: rare diet drift. A niche tweak still reshapes the speed/sense
-            # baseline (no half-viable hybrid phenotypes: a photosynthetic body plan
-            # with a predator's speed, or vice-versa, is inviable).
-            if random.random() < self.mut_rate * 0.5:
+            # Minor path: rare diet drift. A niche tweak still reshapes the
+            # speed/sense baseline (no half-viable hybrid phenotypes).
+            if random.random() < mut_diet * 0.5:
                 alt = [d for d in alt_diets if d != self.diet]
                 if alt:
                     child_diet = random.choice(alt)

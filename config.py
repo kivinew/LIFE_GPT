@@ -173,6 +173,15 @@ TEMP_SMOOTH_RATE = (
 )
 TEMP_METABOLISM_MIN = 0.5  # metabolism multiplier at temp=0.0 (cold slows metabolism)
 
+# ── Temperature-dependent mutation spectrum ──────────────────────────
+# Cold environments favour gross ecological shifts (diet/niche switches);
+# warm environments favour fine motoric/sensory drift. The two spectra swing
+# symmetrically around TEMP_MUT_NEUTRAL by ±TEMP_MUT_SWING, so the multiplier
+# for each never collapses to zero (min = 1 - swing = 0.5 at the extreme).
+TEMP_MUT_NEUTRAL = 0.5   # temperature where diet/other mutation chances are equal
+TEMP_MUT_SWING = 0.5    # max fractional deviation of a multiplier from 1.0
+TEMP_MUT_DEFAULT = 0.7   # fallback when no field temperature is available
+
 # ── Zoophagy (predator feeding efficiency) ─────────────────────────────
 ZOO_PHAGY_MIN = 0.5  # min feeding efficiency multiplier
 ZOO_PHAGY_MAX = 2.0  # max feeding efficiency multiplier
@@ -267,6 +276,8 @@ L10N = {
         "environment": "Среда",
         "game_settings": "Настройки игры",
         "tick": "тик",
+        "divisions": "делений",
+        "food": "еда",
         "zoom": "Масштаб: {}",
         "rec_enter": "Центрировать [Home]",
     },
@@ -345,6 +356,8 @@ L10N = {
         "environment": "Environment",
         "game_settings": "Game Settings",
         "tick": "tick",
+        "divisions": "divisions",
+        "food": "food",
         "zoom": "Zoom: {}",
         "rec_enter": "Recenter [Home]",
     },

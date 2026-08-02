@@ -458,7 +458,10 @@ def main():
     music_volume = 0.25
     music_volume_step = 0.25
     music_volume_increasing = False
-    pygame.mixer.music.set_volume(music_volume)
+    music_fade_timer = 0
+    music_fade_duration = 300  # 5 seconds at 60 FPS
+    pygame.mixer.music.set_volume(0.0)
+    pygame.mixer.music.play(-1)
     sl_music.val = music_volume
 
     # SFX volume cycling state (like music, but for sound effects)
@@ -496,6 +499,7 @@ def main():
     paused = False
     running = True
     tick = 0
+    divisions = 0
     follow_mode = False
     show_stats = True
     show_memory = False
@@ -673,7 +677,6 @@ def main():
                 music_volume_increasing = False
             elif music_volume <= 0.0:
                 music_volume_increasing = True
-            pygame.mixer.music.set_volume(music_volume)
 
             # ── Mouse click / marquee selection ─────────────────────
             if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
@@ -757,6 +760,14 @@ def main():
         sfx_volume = st.sfx_volume
         sfx_volume_increasing = st.sfx_volume_increasing
         music_volume_increasing = st.music_volume_increasing
+
+        # Music fade-in: gradually raise volume from 0 to target over 5 seconds
+        if music_fade_timer < music_fade_duration:
+            music_fade_timer += 1
+            fade_progress = music_fade_timer / music_fade_duration
+            pygame.mixer.music.set_volume(music_volume * fade_progress)
+        else:
+            pygame.mixer.music.set_volume(music_volume)
 
         # Keep speed/sense sliders in sync with the selected cell (unless dragging)
         if sel_cell is not None and not sliders[0].drag and not sliders[1].drag:
@@ -906,7 +917,7 @@ def main():
                 frame_surface.fill(BG)
 
                 # Draw the scene
-                field.draw(frame_surface)
+                field.draw(frame_surface, season_name)
                 for cp in corpses:
                     if -50 < cp.x < W - SB + 50 and -50 < cp.y < H + 50:
                         cp.draw_at(frame_surface, cp.x, cp.y)
@@ -957,7 +968,7 @@ def main():
             scaled_surf.fill(BG)
         world_surf = scaled_surf  # reuse
 
-        field.draw(world_surf)
+        field.draw(world_surf, season_name)
         for cp in corpses:
             if -50 < cp.x < world_w + 50 and -50 < cp.y < world_h + 50:
                 cp.draw_at(world_surf, cp.x, cp.y)
@@ -1081,9 +1092,13 @@ def main():
 
         # ── UI: Stats (top-left) ─────────────────────────────────────────
         if show_stats:
+            import cell
+            food_pct = field.data.mean() * 100
             stats = [
                 f"{tr('cells')}: {len(cells)}/{MAX_CELLS} ({tr('dead')}: {len(corpses)})",
                 f"{tr('tick')}: {tick}",
+                f"{tr('divisions')}: {cell.divisions}",
+                f"{tr('food')}: {food_pct:.1f}%",
                 f"{tr('season')}: {tr(season_name)}",
                 f"{tr('temp')}: {-10.0 + field.temperature * 45.0:.1f}°C",
                 f"{tr('zoom')}: {zoom:.2f}x",

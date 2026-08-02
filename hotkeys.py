@@ -15,6 +15,7 @@ from config import (
     tr,
     DIET_DEFAULT_SPEED,
     DIET_DEFAULT_SENSE,
+    TEMP_MUT_DEFAULT,
 )
 from cell import Cell, play_sound
 from field import ResourceField
@@ -274,9 +275,10 @@ def handle_key(e, st):
         _set_diet(st, POLY)
 
     elif k == pygame.K_x:
+        temp = st.field.temperature if st.field else TEMP_MUT_DEFAULT
         for c in st.cells:
             if c.selected:
-                c.genome = c.genome.clone_mutate()
+                c.genome = c.genome.clone_mutate(temp)
                 c.refresh_class()
                 play_sound("mutation")
     elif k == pygame.K_d:
@@ -327,15 +329,18 @@ def handle_key(e, st):
 
     elif k == pygame.K_1 and (pygame.key.get_mods() & pygame.KMOD_CTRL):
         if len(st.cells) < MAX_CELLS:
-            st.cells.append(Cell(W // 2, H // 2, TEMPLATES[0]["genes"].clone_mutate()))
+            temp = st.field.temperature if st.field else TEMP_MUT_DEFAULT
+            st.cells.append(Cell(W // 2, H // 2, TEMPLATES[0]["genes"].clone_mutate(temp)))
     elif k == pygame.K_2 and (pygame.key.get_mods() & pygame.KMOD_CTRL):
         if len(st.cells) < MAX_CELLS:
-            g = TEMPLATES[1]["genes"].clone_mutate()
+            temp = st.field.temperature if st.field else TEMP_MUT_DEFAULT
+            g = TEMPLATES[1]["genes"].clone_mutate(temp)
             g.speed = 4.0
             st.cells.append(Cell(W // 2, H // 2, g))
     elif k == pygame.K_3 and (pygame.key.get_mods() & pygame.KMOD_CTRL):
         if len(st.cells) < MAX_CELLS:
-            g = TEMPLATES[2]["genes"].clone_mutate()
+            temp = st.field.temperature if st.field else TEMP_MUT_DEFAULT
+            g = TEMPLATES[2]["genes"].clone_mutate(temp)
             g.sense = 90.0
             st.cells.append(Cell(W // 2, H // 2, g))
 
