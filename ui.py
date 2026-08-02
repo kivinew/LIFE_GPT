@@ -35,19 +35,33 @@ class Slider:
         self._cached_text_str = None
 
     def draw(self, surf, font):
-        text_str = self.labels[self.val]
+        if self.unit:
+            text_str = f"{self.lab}: {self.val:.0f}{self.unit}"
+        else:
+            text_str = f"{self.lab}: {self.val:.2f}"
         if self._cached_text is None or self._cached_text_str != text_str:
             self._cached_text = font.render(text_str, True, WHITE)
             self._cached_text_str = text_str
-        pygame.draw.rect(surf, DARK, self.rect, 0, 4)
-        pygame.draw.rect(surf, BLUE, self.rect, 1, 4)
-        surf.blit(
-            self._cached_text,
-            (
-                self.rect.centerx - self._cached_text.get_width() // 2,
-                self.rect.centery - self._cached_text.get_height() // 2,
-            ),
+        surf.blit(self._cached_text, (self.rect.x, self.rect.y - 12))
+        pygame.draw.rect(
+            surf, DARK, (self.rect.x, self.rect.y + 3, self.rect.w, 6), 0, 3
         )
+        fw = int((self.val - self.mn) / (self.mx - self.mn) * self.rect.w)
+        pygame.draw.rect(surf, BLUE, (self.rect.x, self.rect.y + 3, fw, 6), 0, 3)
+        if self.labels and len(self.labels) > 1:
+            n = len(self.labels)
+            for i in range(n):
+                lx = self.rect.x + int(i * self.rect.w / (n - 1))
+                ly = self.rect.y + 11
+                tick_col = (
+                    BLUE
+                    if self.val >= self.mn + i * (self.mx - self.mn) / (n - 1)
+                    and self.val < self.mn + (i + 1) * (self.mx - self.mn) / (n - 1)
+                    else GRAY
+                )
+                pygame.draw.line(surf, tick_col, (lx, ly - 1), (lx, ly + 1), 1)
+                lt = font.render(self.labels[i], True, tick_col)
+                surf.blit(lt, (lx - lt.get_width() // 2, ly + 3))
 
     def handle(self, event):
         if (
@@ -89,19 +103,34 @@ class SliderInt:
         self._cached_text_str = None
 
     def draw(self, surf, font):
-        text_str = self.labels[self.val]
+        current_label = self.labels[int(self.val)] if self.labels else str(self.val)
+        text_str = f"{self.lab}: {current_label}"
         if self._cached_text is None or self._cached_text_str != text_str:
             self._cached_text = font.render(text_str, True, WHITE)
             self._cached_text_str = text_str
-        pygame.draw.rect(surf, DARK, self.rect, 0, 4)
-        pygame.draw.rect(surf, BLUE, self.rect, 1, 4)
-        surf.blit(
-            self._cached_text,
-            (
-                self.rect.centerx - self._cached_text.get_width() // 2,
-                self.rect.centery - self._cached_text.get_height() // 2,
-            ),
+        surf.blit(self._cached_text, (self.rect.x, self.rect.y - 12))
+        pygame.draw.rect(
+            surf, DARK, (self.rect.x, self.rect.y + 3, self.rect.w, 6), 0, 3
         )
+        fw = (
+            int((self.val - self.mn) / (self.mx - self.mn) * self.rect.w)
+            if self.mx > self.mn
+            else 0
+        )
+        pygame.draw.rect(surf, BLUE, (self.rect.x, self.rect.y + 3, fw, 6), 0, 3)
+        if self.labels and len(self.labels) > 0:
+            n = len(self.labels)
+            for i in range(n):
+                lx = (
+                    self.rect.x + int(i * self.rect.w / (n - 1))
+                    if n > 1
+                    else self.rect.x
+                )
+                ly = self.rect.y + 11
+                tick_col = BLUE if i == int(self.val) else GRAY
+                pygame.draw.line(surf, tick_col, (lx, ly - 1), (lx, ly + 1), 1)
+                lt = font.render(self.labels[i], True, tick_col)
+                surf.blit(lt, (lx - lt.get_width() // 2, ly + 3))
 
     def handle(self, event):
         if (
@@ -133,6 +162,9 @@ class Toggle:
     def __init__(self, x, y, w, h, labels, val=0):
         self.rect = pygame.Rect(x, y, w, h)
         self.labels, self.val = labels, val
+        self.drag = False
+        self._cached_text = None
+        self._cached_text_str = None
 
     def draw(self, surf, font):
         text_str = self.labels[self.val]
