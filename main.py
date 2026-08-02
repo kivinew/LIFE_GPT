@@ -505,7 +505,8 @@ def main():
     time_lapse_duration = 10  # seconds
 
     init_logging()
-    pop_graph = PopulationGraph(history_length=10000, sample_interval=10)
+    # Reduced history for better performance with many cells
+    pop_graph = PopulationGraph(history_length=2000, sample_interval=10)
 
     st = HotkeyState(
         cells=cells,
