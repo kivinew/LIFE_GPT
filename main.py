@@ -307,12 +307,19 @@ def _palette_click(pop_graph, pos):
 
 # ═══════════════════════════════════════════════════════════════════════
 def eat_corpses(cells, corpses, dt):
-    """POLY cells near a corpse consume it: corpse mass shrinks, eater gains energy."""
+    """Cells near a corpse consume it: corpse mass shrinks, eater gains energy.
+
+    POLY cells eat corpses within CORPSE_EAT_RADIUS.
+    ZOOP cells are attracted to corpses within CORPSE_ATTRACT_RADIUS
+    and gain a small energy boost when nearby (scavenging behavior).
+    PHOT cells ignore corpses.
+    """
     if not corpses:
         return
     for cp in corpses:
         if cp.done:
             continue
+        # Find best eater within eat radius (POLY only)
         eater = None
         best_d = CORPSE_EAT_RADIUS
         for c in cells:
@@ -326,6 +333,19 @@ def eat_corpses(cells, corpses, dt):
             gain = CORPSE_EAT_RATE * dt
             cp.mass = max(0.0, cp.mass - gain / CORPSE_EAT_EFFICIENCY)
             eater.energy = min(eater.max_energy, eater.energy + gain)
+            continue
+
+        # ZOOP scavenging: attracted to corpses, gain small energy
+        for c in cells:
+            if c.energy <= 0 or c.genome.diet != ZOOP:
+                continue
+            d = math.hypot(c.x - cp.x, c.y - cp.y)
+            if d < CORPSE_ATTRACT_RADIUS:
+                # Small energy gain for scavenging nearby
+                c.energy = min(
+                    c.max_energy,
+                    c.energy + CORPSE_SCAVENGE_RATE * dt,
+                )
 
 
 # ═══════════════════════════════════════════════════════════════════════

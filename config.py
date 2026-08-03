@@ -183,6 +183,8 @@ DECOMPOSITION_TICKS = 300  # visual decay duration of a corpse (ticks)
 CORPSE_EAT_RADIUS = 35.0  # distance for POLY cells to eat a corpse
 CORPSE_EAT_RATE = 0.02  # energy gained per tick while eating
 CORPSE_EAT_EFFICIENCY = 0.8  # energy gained per unit of corpse mass consumed
+CORPSE_ATTRACT_RADIUS = 80.0  # ZOOP scavenging radius (attracted to corpses)
+CORPSE_SCAVENGE_RATE = 0.008  # energy gained per tick for ZOOP scavenging
 CORPSE_NUTRIENT_FIELD_RATE = (
     0.06  # cluster amount fed into the field per tick (was 0.03)
 )
