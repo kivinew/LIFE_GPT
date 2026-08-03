@@ -148,8 +148,8 @@ color. Diet legend sits under the population graph (legend_y=846); labels "Фо�
 - Selected cells with energy below 30% of max play a heartbeat sound every ~60 ticks.
 
 ### Genome class (`genome.py`)
-`Genome` uses `__slots__` (17 slots), NOT a dataclass. Values clamped in `__init__`. `clone_mutate()` does ±15% random perturbation per gene.
-Default speed/sense depend on diet (`DIET_DEFAULT_SPEED/SENSE` in config.py): PHOT=min (0.5/10), POLY=mid (2.0/65), ZOOP=max (4.0/120) — applied only when speed/sense aren't passed explicitly.
+`Genome` uses `__slots__` (17 slots), NOT a dataclass. Values clamped in `__init__`. `clone_mutate(temperature=...)` does ±15% continuous drift per gene (the speciation engine via the hash in `refresh_class()`). With probability `major_mut_rate` it instead runs a single coherent leap: a diet switch (resets speed/sense to the new niche's `DIET_DEFAULT_*`) or a sense-organ jump. Temperature biases the spectrum — cold favours diet/niche mutations, warm favours motoric/sensory drift (`TEMP_MUT_NEUTRAL`/`TEMP_MUT_SWING` in config.py).
+Default speed/sense depend on diet (`DIET_DEFAULT_SPEED/SENSE` in config.py): PHOT=min (0.5/30), POLY=mid (2.0/65), ZOOP=max (4.0/120) — applied only when speed/sense aren't passed explicitly.
 
 ### Cell class (`cell.py`)
 `step()` runs 10 phases: sensory → predator behavior → reaction → pack behavior → movement → feeding → combat → metabolism → stress → energy/level/social. Imports `CellMemory` from `memory.py`.
