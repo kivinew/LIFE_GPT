@@ -1010,7 +1010,11 @@ class Cell:
         x, y = int(dx), int(dy)
         r = max(3, int(2 + self.genome.mass * 1.5))
         col = YEL if self.selected else self.color
-        pygame.draw.circle(surf, col, (x, y), r)
+        energy_ratio = max(0.0, min(1.0, self.energy / self.max_energy))
+        dark = tuple(int(c * 0.3) for c in col[:3])
+        bright = col[:3]
+        blended = tuple(int(d + (b - d) * energy_ratio) for d, b in zip(dark, bright))
+        pygame.draw.circle(surf, blended, (x, y), r)
         if self.selected:
             sr = int(self.genome.sense)
             ss = pygame.Surface((sr * 2, sr * 2), pygame.SRCALPHA)

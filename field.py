@@ -10,6 +10,8 @@ from config import (
     CORPSE_NUTRIENT_FADE,
     CORPSE_NUTRIENT_DRAW_MAX,
     CORPSE_NUTRIENT_BOOST_RADIUS,
+    SEASON_FOOD_COLORS,
+    FOOD_DECAY_RATE,
 )
 
 
@@ -199,23 +201,12 @@ class ResourceField:
     # ── Temperature effects on regeneration ──
     def _get_temp_regen_factor(self) -> float:
         """Temperature multiplier for food regeneration.
-        Optimal at ~0.6 (temperate), decreases at extremes.
+        Smoothly proportional to temperature: 0 at temp=0, 1 at temp=1.
         Below 0°C (temp < 0.222) no regeneration."""
-        temp = self.temperature
-        FREEZE = 0.222  # 0°C in internal units (-10 + 0.222*45 ≈ 0)
-        if temp < FREEZE:
+        FREEZE = 0.222  # 0°C in internal units
+        if self.temperature < FREEZE:
             return 0.0
-        elif temp < 0.3:
-            # Cold: slow regen, smooth up to the temperate branch
-            return 0.3 + temp
-        elif temp > 0.8:
-            # Hot: slow regen (desertification)
-            return 1.2 - temp * 0.5
-        else:
-            # Temperate: optimal regen
-            return 0.8 + 0.4 * (
-                1.0 - abs(temp - 0.6) / 0.2
-            )
+        return self.temperature
 
     def step(self, dt: float, current_cell_count: int) -> None:
         w, h = self.w, self.h
@@ -224,6 +215,11 @@ class ResourceField:
         # --- Temperature-modified regen ---
         temp_factor = self._get_temp_regen_factor()
         effective_regen = self.base_regen * temp_factor
+
+        # --- Food decay (natural lifetime) ---
+        # All food decays slowly so it doesn't accumulate indefinitely.
+        # This creates a natural turnover: FOOD_DECAY_RATE per tick.
+        d *= (1.0 - FOOD_DECAY_RATE * dt)
 
         # --- Carrying capacity scaling ---
         if hasattr(self, "max_cells_for_carrying"):
@@ -292,14 +288,7 @@ class ResourceField:
 
         return t * multiplier
 
-    _SEASON_FOOD_COLOR = {
-        "spring": (0, 1, 0),    # green
-        "summer": (1, 1, 0),    # yellow
-        "autumn": (1, 0.5, 0),  # orange
-        "winter": (0, 0.5, 1),  # blue
-    }
-
-    def draw(self, surf, season="spring"):
+    def draw(self, surf, season="spring", season_progress=0.0, next_season="spring"):
         w, h = self.w, self.h
         d = self.data
 
@@ -308,7 +297,14 @@ class ResourceField:
 
         buf = pygame.surfarray.pixels3d(self._fsurf)
         g = (np.clip(d, 0.0, 1.0) * 255).astype(np.uint8)
-        rc, gc, bc = self._SEASON_FOOD_COLOR.get(season, (0, 1, 0))
+
+        # Smoothly interpolate food color between current and next season
+        cur_col = SEASON_FOOD_COLORS.get(season, (0.0, 0.8, 0.0))
+        nxt_col = SEASON_FOOD_COLORS.get(next_season, (0.0, 0.8, 0.0))
+        sp = max(0.0, min(1.0, season_progress))
+        rc = cur_col[0] * (1 - sp) + nxt_col[0] * sp
+        gc = cur_col[1] * (1 - sp) + nxt_col[1] * sp
+        bc = cur_col[2] * (1 - sp) + nxt_col[2] * sp
         buf[:, :, 0] = (g * rc).astype(np.uint8)
         buf[:, :, 1] = (g * gc).astype(np.uint8)
         buf[:, :, 2] = (g * bc).astype(np.uint8)

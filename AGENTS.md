@@ -4,7 +4,11 @@
 ```bash
 python main.py                      # run the sim
 python setup.py build_ext --inplace  # build Cython extension (optional, ~10x speedup)
+python build_exe.py                 # build standalone .exe (requires PyInstaller)
 ```
+
+## Building standalone executable
+Run `python build_exe.py` to compile the simulation into a single `dist/life_gpt.exe` using PyInstaller. The build bundles pygame, numpy, all `.mp3` sound files from `src/sounds/`, and optionally `base64.txt` for background music. The spec file is `build_exe.spec`.
 
 ## Project overview
 
@@ -88,6 +92,17 @@ Dragging the slider sets the **base** % (temp/season factors scaled back out). E
   1.2 at 0.6, 0.7 at temp 1.0 (discontinuity at 0.3 fixed 2026-08-01).
 Final per-tick: `regen_amount = base_regen * temp_factor * dt` added to 200 random cells.
 
+### Food decay and lifetime
+All food energy decays exponentially at `FOOD_DECAY_RATE` per tick (~0.1%), so
+food doesn't accumulate indefinitely. After `FOOD_LIFETIME_TICKS=3000` ticks,
+food retains ~5% of its original value, creating a natural resource turnover.
+
+### Smooth seasonal color
+Food color is interpolated between consecutive seasons using `SEASON_FOOD_COLORS`
+in config.py (spring=green, summer=yellow-green, autumn=orange, winter=blue).
+The `draw()` method in field.py accepts `season_progress` (0.0→1.0) and `next_season`
+to blend colors smoothly — no abrupt color changes at season boundaries.
+
 ### UI layout (two-column sidebar)
 ```python
 COL_W  = 285                     # column width
@@ -148,7 +163,7 @@ color. Diet legend sits under the population graph (legend_y=846); labels "Фо�
 - Selected cells with energy below 30% of max play a heartbeat sound every ~60 ticks.
 
 ### Genome class (`genome.py`)
-`Genome` uses `__slots__` (17 slots), NOT a dataclass. Values clamped in `__init__`. `clone_mutate(temperature=...)` does ±15% continuous drift per gene (the speciation engine via the hash in `refresh_class()`). With probability `major_mut_rate` it instead runs a single coherent leap: a diet switch (resets speed/sense to the new niche's `DIET_DEFAULT_*`) or a sense-organ jump. Temperature biases the spectrum — cold favours diet/niche mutations, warm favours motoric/sensory drift (`TEMP_MUT_NEUTRAL`/`TEMP_MUT_SWING` in config.py).
+`Genome` uses `__slots__` (17 slots), NOT a dataclass. Values clamped in `__init__`. `clone_mutate(temperature=...)` does ±15% continuous drift per gene (the speciation engine via the hash in `refresh_class()`). With probability `major_mut_rate` it instead runs a single coherent leap: a diet switch (resets speed/sense to the new niche's `DIET_DEFAULT_*`) or a sense-organ jump. Temperature biases the spectrum — cold favours diet/niche mutations, warm favours motoric/sensory drift (`TEMP_MUT_NEUTRAL`/`TEMP_MUT_SWING` in config.py). Diet transitions are asymmetrically weighted: the "forward" niche cycle PHOT→POLY→ZOOP→PHOT has weight 0.3, the reverse 0.1, biasing mutations toward the polyphagic intermediate while allowing cycles to complete.
 Default speed/sense depend on diet (`DIET_DEFAULT_SPEED/SENSE` in config.py): PHOT=min (0.5/30), POLY=mid (2.0/65), ZOOP=max (4.0/120) — applied only when speed/sense aren't passed explicitly.
 
 ### Cell class (`cell.py`)

@@ -52,11 +52,13 @@ class HotkeyState:
         "cam_x",
         "cam_y",
         "zoom",
+        "show_memory",
     )
 
     def __init__(self, **kwargs):
         for name in self.__slots__:
             setattr(self, name, kwargs.get(name))
+        self.show_memory = kwargs.get("show_memory", False)
 
 
 # ── Preset templates ──────────────────────────────────────────────────

@@ -127,6 +127,19 @@ SEASON_FACTORS = {
     "winter": {"regen_mult": 0.5, "hotspot_boost": 0.5, "divide_mult": 0.5},
 }
 
+# ── Season food colors (RGB, 0..1) for smooth interpolation ────────────────
+SEASON_FOOD_COLORS = {
+    "spring": (0.0, 0.8, 0.0),    # green
+    "summer": (0.8, 0.9, 0.0),    # yellow-green
+    "autumn": (0.9, 0.5, 0.0),    # orange
+    "winter": (0.2, 0.5, 1.0),    # blue
+}
+
+# ── Food lifetime ───────────────────────────────────────────────────────────
+# Food decays over time to prevent indefinite accumulation
+FOOD_LIFETIME_TICKS = 3000  # approximate lifetime before food fades to half
+FOOD_DECAY_RATE = 0.001    # fraction lost per tick (~50% in 693 ticks)
+
 # ── Disease ──────────────────────────────────────────────────────
 DISEASE_CHANCE = 0.001  # chance per tick to get infected
 DISEASE_DURATION = 500  # ticks of sickness

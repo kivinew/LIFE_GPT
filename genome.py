@@ -154,6 +154,26 @@ class Genome:
         def reset_to_diet(diet):
             return DIET_DEFAULT_SPEED[diet], DIET_DEFAULT_SENSE[diet]
 
+        # Asymmetric diet-transition weights reflecting a circular niche
+        # progression: PHOT->POLY->ZOOP->PHOT is the "forward" direction
+        # (weight 0.1), the reverse is "backward" (weight 0.3). This biases
+        # mutations toward the polyphagic intermediate without making it a
+        # sink — cycles can still complete.
+        _DIET_TRANS_WEIGHTS = {
+            (PHOT, POLY): 0.3,  # phot -> poly: favored
+            (PHOT, ZOOP): 0.1,  # phot -> zoop: rarer
+            (POLY, ZOOP): 0.3,  # poly -> zoop: favored
+            (POLY, PHOT): 0.1,  # poly -> phot: rarer
+            (ZOOP, POLY): 0.3,  # zoop -> poly: favored
+            (ZOOP, PHOT): 0.1,  # zoop -> phot: rarer
+        }
+
+        def weighted_diet(from_diet):
+            """Pick a new diet with asymmetric transition weights."""
+            choices = [d for d in alt_diets if d != from_diet]
+            weights = [_DIET_TRANS_WEIGHTS[(from_diet, d)] for d in choices]
+            return random.choices(choices, weights=weights, k=1)[0]
+
         child_diet = self.diet
         child_speed = drift(self.speed, 0.5, 4.0)
         child_sense = drift(self.sense, 30.0, 120.0)
@@ -170,7 +190,7 @@ class Genome:
                     sense_change = False
 
             if diet_change:
-                child_diet = random.choice([d for d in alt_diets if d != self.diet])
+                child_diet = weighted_diet(self.diet)
                 child_speed, child_sense = reset_to_diet(child_diet)
             elif sense_change:
                 # Evolve / lose a sense organ: a big jump on the perception axis.
@@ -179,10 +199,8 @@ class Genome:
             # Minor path: rare diet drift. A niche tweak still reshapes the
             # speed/sense baseline (no half-viable hybrid phenotypes).
             if random.random() < mut_diet * 0.5:
-                alt = [d for d in alt_diets if d != self.diet]
-                if alt:
-                    child_diet = random.choice(alt)
-                    child_speed, child_sense = reset_to_diet(child_diet)
+                child_diet = weighted_diet(self.diet)
+                child_speed, child_sense = reset_to_diet(child_diet)
 
         child_lifespan = int(self.lifespan_ticks * random.uniform(0.80, 1.20))
 

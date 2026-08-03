@@ -121,6 +121,10 @@ except ImportError:
 # Project directory for asset loading
 _project_dir = os.path.dirname(os.path.abspath(__file__))
 
+# Ensure project root is on sys.path (critical for PyInstaller / bundled exe)
+if _project_dir not in sys.path:
+    sys.path.insert(0, _project_dir)
+
 
 # ═══════════════════════════════════════════════════════════════════════
 #  Preset templates (moved to hotkeys.py)
@@ -434,7 +438,8 @@ def main():
     sl_sfx = Slider(COL_RX, 726, COL_W, tr("sfx"), 0.0, 1.0, 0.1)
     sl_music = Slider(COL_RX, 766, COL_W, tr("music"), 0.0, 1.0, 0.8)
 
-    # Load background music from base64.txt
+    # Load background music: base64.txt -> existing bg_music.mp3 -> heartbeat.mp3 fallback
+    music_loaded = False
     try:
         base64_path = os.path.join(_project_dir, "base64.txt")
         if os.path.exists(base64_path):
@@ -443,21 +448,35 @@ def main():
             with open(music_path, "wb") as f:
                 f.write(music_data)
             pygame.mixer.music.load(music_path)
-            pygame.mixer.music.set_volume(sl_music.val)
-            pygame.mixer.music.play(-1)
             print("Successfully loaded background music from base64.txt")
-        else:
-            raise FileNotFoundError("base64.txt not found")
+            music_loaded = True
     except Exception as e:
         print(f"Could not load music from base64.txt: {e}")
+
+    if not music_loaded:
+        bg_music_path = os.path.join(_sounds_dir, "bg_music.mp3")
+        if os.path.exists(bg_music_path):
+            try:
+                pygame.mixer.music.load(bg_music_path)
+                print("Loaded bg_music.mp3 directly from sounds directory")
+                music_loaded = True
+            except Exception as e:
+                print(f"Could not load bg_music.mp3: {e}")
+
+    if music_loaded:
+        pygame.mixer.music.play(-1)
+    else:
         heartbeat_path = os.path.join(_sounds_dir, "heartbeat.mp3")
         if os.path.exists(heartbeat_path):
-            pygame.mixer.music.load(heartbeat_path)
-            pygame.mixer.music.set_volume(sl_music.val)
-            pygame.mixer.music.play(-1)
-            print("Using heartbeat.mp3 as fallback music")
+            try:
+                pygame.mixer.music.load(heartbeat_path)
+                pygame.mixer.music.play(-1)
+                print("Using heartbeat.mp3 as fallback music")
+                music_loaded = True
+            except Exception as e:
+                print(f"Could not load heartbeat.mp3: {e}")
         else:
-            print("No fallback music available - music will be disabled")
+            print("No background music available - music will be disabled")
 
     # Music volume cycling state
     music_volume = 0.25
@@ -466,7 +485,8 @@ def main():
     music_fade_timer = 0
     music_fade_duration = 300  # 5 seconds at 60 FPS
     pygame.mixer.music.set_volume(0.0)
-    pygame.mixer.music.play(-1)
+    if music_loaded:
+        pygame.mixer.music.play(-1)
     sl_music.val = music_volume
 
     # SFX volume cycling state (like music, but for sound effects)
@@ -806,7 +826,8 @@ def main():
             regen_mult = regen_mult_target * field._get_temp_regen_factor()
             if sl_regen.drag and regen_mult > 0.0:
                 regen_base = min(100.0, max(0.0, sl_regen.val / regen_mult))
-            sl_regen.val = min(100.0, regen_base * regen_mult)
+            target_regen_val = min(100.0, regen_base * regen_mult)
+            sl_regen.val += (target_regen_val - sl_regen.val) * 0.05
             target_regen = (regen_base / 100.0) * REGEN_MAX_RATE * regen_mult_target
             field.base_regen += (target_regen - field.base_regen) * REGEN_SMOOTH_RATE
 
@@ -925,7 +946,12 @@ def main():
                 frame_surface.fill(BG)
 
                 # Draw the scene
-                field.draw(frame_surface, season_name)
+                field.draw(
+                    frame_surface,
+                    season=season_name,
+                    season_progress=season_progress,
+                    next_season=SEASON_ORDER[(season_idx + 1) % 4],
+                )
                 for cp in corpses:
                     if -50 < cp.x < W - SB + 50 and -50 < cp.y < H + 50:
                         cp.draw_at(frame_surface, cp.x, cp.y)
@@ -976,7 +1002,12 @@ def main():
             scaled_surf.fill(BG)
         world_surf = scaled_surf  # reuse
 
-        field.draw(world_surf, season_name)
+        field.draw(
+            world_surf,
+            season=season_name,
+            season_progress=season_progress,
+            next_season=SEASON_ORDER[(season_idx + 1) % 4],
+        )
         for cp in corpses:
             if -50 < cp.x < world_w + 50 and -50 < cp.y < world_h + 50:
                 cp.draw_at(world_surf, cp.x, cp.y)
