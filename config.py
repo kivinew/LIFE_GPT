@@ -133,9 +133,6 @@ DISEASE_DURATION = 500  # ticks of sickness
 DISEASE_METABOLISM_MULT = 2.0  # metabolism multiplier when sick
 DISEASE_TRANSMISSION_RANGE = 50.0  # transmission distance
 
-# ── BoMouse species detection ──────────────────────────────────────
-SPECIES_SIMILARITY_THRESHOLD = 0.85  # Similarity threshold for speciation
-
 # ── Minimum populations to prevent extinction ────────────────────────────
 PHOT_MIN_REQUIRED = 2  # minimum PHOT population to prevent extinction
 ZOOP_MIN_REQUIRED = 1  # minimum ZOOP population to prevent extinction

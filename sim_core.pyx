@@ -12,29 +12,32 @@ cimport numpy as np
 cimport cython
 
 # ── Constants (duplicated from config.py for Cython compile-time) ──
+# IMPORTANT: keep these in sync with config.py — edits to balance values in
+# config.py are silently ignored by the compiled .pyd unless these are updated
+# and sim_core is rebuilt (`python setup_sim_core.py build_ext --inplace`).
 cdef int _PHOT = 0
 cdef int _ZOOP = 1
 cdef int _POLY = 2
 
-cdef double _ENERGY_MASS_COEFF = 4.5
-cdef double _LEVEL_UP_THRESHOLD = 0.60
-cdef double _LEVEL_DOWN_THRESHOLD = 3.0
-cdef int _MAX_LEVEL = 10
-cdef double _LEVEL_MASS_BASE = 2.0
-cdef double _LEVEL_MASS_STEP = 0.6
+cdef double _ENERGY_MASS_COEFF = 4.5          # config: ENERGY_MASS_COEFF
+cdef double _LEVEL_UP_THRESHOLD = 0.60        # config: LEVEL_UP_THRESHOLD
+cdef double _LEVEL_DOWN_THRESHOLD = 3.0       # config: LEVEL_DOWN_THRESHOLD
+cdef int _MAX_LEVEL = 10                      # config: MAX_LEVEL
+cdef double _LEVEL_MASS_BASE = 2.0            # config: LEVEL_MASS_BASE
+cdef double _LEVEL_MASS_STEP = 0.6            # config: LEVEL_MASS_STEP
 
-cdef double _BASE_METABOLISM_MULT = 1.0
-cdef double _PREDATOR_METABOLISM_MULT = 0.55  # Was 0.75 — reduced for ZOOP survival
-cdef double _SPEED_COST = 0.05
-cdef double _MASS_PENALTY = 0.0028
-cdef double _FEED_EFFICIENCY_BASE = 18.0  # Reduced from 25.0 to slow PHOT/POLY division
-cdef double _PHOT_FEED_EFFICIENCY = 1.0  # Reduced from 1.2
-cdef double _POLY_FEED_EFFICIENCY = 0.7  # Reduced from 0.95
-cdef double _MIN_MASS_EFFICIENCY = 0.55
-cdef double _COMBAT_BASE_DAMAGE = 0.9  # Reduced from 1.0
-cdef double _COMBAT_DAMAGE_GAIN = 0.8  # Was 0.40 — increased ZOOP reward
-cdef double _MASS_DMG_EFFICIENCY = 0.035
-cdef double _MIN_MASS_DMG_EFF = 0.45
+cdef double _BASE_METABOLISM_MULT = 1.0       # config: BASE_METABOLISM_MULT
+cdef double _PREDATOR_METABOLISM_MULT = 0.55  # config: PREDATOR_METABOLISM_MULT
+cdef double _SPEED_COST = 0.05                 # config: SPEED_COST
+cdef double _MASS_PENALTY = 0.0028             # config: MASS_PENALTY
+cdef double _FEED_EFFICIENCY_BASE = 22.0       # config: FEED_EFFICIENCY_BASE (was 18.0)
+cdef double _PHOT_FEED_EFFICIENCY = 1.0        # config: PHOT_FEED_EFFICIENCY
+cdef double _POLY_FEED_EFFICIENCY = 0.7        # config: POLY_FEED_EFFICIENCY
+cdef double _MIN_MASS_EFFICIENCY = 0.55        # config: MIN_MASS_EFFICIENCY
+cdef double _COMBAT_BASE_DAMAGE = 0.9          # config: COMBAT_BASE_DAMAGE
+cdef double _COMBAT_DAMAGE_GAIN = 0.8          # config: COMBAT_DAMAGE_GAIN
+cdef double _MASS_DMG_EFFICIENCY = 0.035        # config: MASS_DMG_EFFICIENCY
+cdef double _MIN_MASS_DMG_EFF = 0.45           # config: MIN_MASS_DMG_EFF
 
 cdef int _CELL_SIZE = 48
 cdef int _SB = 600

@@ -22,9 +22,6 @@ from config import (
     POLY,
     INTERACT_MIN,
     MAX_CELLS,
-    PHOT_MIN_REQUIRED,
-    ZOOP_MIN_REQUIRED,
-    POLY_MIN_REQUIRED,
     BG,
     DARK,
     GRAY,
@@ -107,7 +104,6 @@ from config import (
 from field import ResourceField
 from cell import Cell, Corpse, diet_color, set_sounds, play_sound
 from genome import Genome
-from config import SPECIES_SIMILARITY_THRESHOLD
 from spatial import build_spatial_grid, get_neighbors
 from memory import CellMemory
 from logger import init_logging, log_tick, close_logging
@@ -443,7 +439,7 @@ def main():
         base64_path = os.path.join(_project_dir, "base64.txt")
         if os.path.exists(base64_path):
             music_data = base64.b64decode(open(base64_path, "rb").read())
-            music_path = os.path.join(_project_dir, "bg_music.mp3")
+            music_path = os.path.join(_sounds_dir, "bg_music.mp3")
             with open(music_path, "wb") as f:
                 f.write(music_data)
             pygame.mixer.music.load(music_path)
