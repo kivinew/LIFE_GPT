@@ -7,4 +7,48 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
+venv/
+
+# Cython build artifacts
+*.c
+*.so
+*.pyd
+sim_core.c
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment and secrets
+.env
+.env.*
+
+# Logs and runtime data
+logs/
+*.log
+
+# User data and saves
+saved_cells.json
+base64.txt
+bg_music.mp3
+
+# Backups and temp files
+*.backup
+*.bak
+ui_fixed.py
+
+# Build directories
+build/
+dist/
+
+# Node.js (for .mimocode if present)
+node_modules/
+package-lock.json
+
+# Claude/mimocode internal
+.mimocode/
+.claude/settings.local.json
