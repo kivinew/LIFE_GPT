@@ -140,6 +140,25 @@ SEASON_FOOD_COLORS = {
 FOOD_LIFETIME_TICKS = 3000  # approximate lifetime before food fades to half
 FOOD_DECAY_RATE = 0.001    # fraction lost per tick (~50% in 693 ticks)
 
+# ── Food generation ─────────────────────────────────────────────────────────
+FOOD_REGEN_SPREAD = 200       # cells boosted per tick (was 200)
+FOOD_CLUSTER_RADIUS = 40      # max distance from a hotspot for clustered regen
+FOOD_CLUSTER_CHANCE = 0.3     # probability of regen near a hotspot vs random
+FOOD_HOTSPOT_BOOST = 0.05     # extra energy added at hotspot center per regen
+
+# ── Nutrient clusters (from dead cells) ─────────────────────────────────────
+CORPSE_NUTRIENT_FIELD_RATE = (
+    0.06  # cluster amount fed into the field per tick (was 0.03)
+)
+CORPSE_NUTRIENT_FADE = (
+    0.985  # per-tick fade of cluster amount (was 0.990 — shorter retention)
+)
+CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
+CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)
+CORPSE_NUTRIENT_BOOST_MULT = 2.5  # multiplier for boost consumption (was 2.0)
+CORPSE_NUTRIENT_EXTRA_ENERGY = 0.5  # extra energy per boost (was 0.3)
+CORPSE_NUTRIENT_MIN_AMOUNT = 0.05  # clusters below this are removed (was 0.1)
+
 # ── Disease ──────────────────────────────────────────────────────
 DISEASE_CHANCE = 0.001  # chance per tick to get infected
 DISEASE_DURATION = 500  # ticks of sickness
@@ -165,13 +184,16 @@ CORPSE_EAT_RADIUS = 35.0  # distance for POLY cells to eat a corpse
 CORPSE_EAT_RATE = 0.02  # energy gained per tick while eating
 CORPSE_EAT_EFFICIENCY = 0.8  # energy gained per unit of corpse mass consumed
 CORPSE_NUTRIENT_FIELD_RATE = (
-    0.03  # cluster amount fed into the field per tick (was 0.02)
+    0.06  # cluster amount fed into the field per tick (was 0.03)
 )
 CORPSE_NUTRIENT_FADE = (
-    0.990  # per-tick fade of cluster amount (was 0.985 — longer retention)
+    0.985  # per-tick fade of cluster amount (was 0.990 — shorter retention)
 )
-CORPSE_NUTRIENT_DRAW_MAX = 7.0  # max marker radius drawn for a cluster
-CORPSE_NUTRIENT_BOOST_RADIUS = 8  # consume-boost radius around a cluster (was 5)
+CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
+CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)
+CORPSE_NUTRIENT_BOOST_MULT = 2.5  # multiplier for boost consumption (was 2.0)
+CORPSE_NUTRIENT_EXTRA_ENERGY = 0.5  # extra energy per boost (was 0.3)
+CORPSE_NUTRIENT_MIN_AMOUNT = 0.05  # clusters below this are removed (was 0.1)
 
 # ── Temperature ───────────────────────────────────────────────────
 TEMP_MIN = 0.0  # min temperature multiplier
@@ -246,6 +268,7 @@ L10N = {
         "music": "Музыка",
         "age": "Возраст",
         "lifespan": "Время жизни",
+        "food_lifetime": "Время жизни еды",
         "fps": "FPS",
         "cells": "Клетки",
         "population": "Популяция",
@@ -329,6 +352,7 @@ L10N = {
         "music": "Music",
         "age": "Age",
         "lifespan": "Lifespan",
+        "food_lifetime": "Food Lifetime",
         "fps": "FPS",
         "cells": "Cells",
         "population": "Population",

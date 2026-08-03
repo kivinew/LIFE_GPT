@@ -10,8 +10,15 @@ from config import (
     CORPSE_NUTRIENT_FADE,
     CORPSE_NUTRIENT_DRAW_MAX,
     CORPSE_NUTRIENT_BOOST_RADIUS,
+    CORPSE_NUTRIENT_BOOST_MULT,
+    CORPSE_NUTRIENT_EXTRA_ENERGY,
+    CORPSE_NUTRIENT_MIN_AMOUNT,
     SEASON_FOOD_COLORS,
     FOOD_DECAY_RATE,
+    FOOD_REGEN_SPREAD,
+    FOOD_CLUSTER_RADIUS,
+    FOOD_CLUSTER_CHANCE,
+    FOOD_HOTSPOT_BOOST,
 )
 
 
@@ -195,7 +202,7 @@ class ResourceField:
 
     def add_nutrient_cluster(self, x, y, amount) -> None:
         x, y = int(x), int(y)
-        if 0 <= x < self.w and 0 <= y < self.h:
+        if 0 <= x < self.w and 0 <= y < self.h and amount > 0.01:
             self.nutrient_clusters.append([x, y, amount])
 
     # ── Temperature effects on regeneration ──
@@ -208,7 +215,7 @@ class ResourceField:
             return 0.0
         return self.temperature
 
-    def step(self, dt: float, current_cell_count: int) -> None:
+    def step(self, dt: float, current_cell_count: int, decay_rate: float = None) -> None:
         w, h = self.w, self.h
         d = self.data
 
@@ -217,9 +224,10 @@ class ResourceField:
         effective_regen = self.base_regen * temp_factor
 
         # --- Food decay (natural lifetime) ---
-        # All food decays slowly so it doesn't accumulate indefinitely.
-        # This creates a natural turnover: FOOD_DECAY_RATE per tick.
-        d *= (1.0 - FOOD_DECAY_RATE * dt)
+        # All food decays so it doesn't accumulate indefinitely.
+        if decay_rate is None:
+            decay_rate = FOOD_DECAY_RATE
+        d *= (1.0 - decay_rate * dt)
 
         # --- Carrying capacity scaling ---
         if hasattr(self, "max_cells_for_carrying"):
@@ -231,10 +239,26 @@ class ResourceField:
 
         effective_regen *= carrying_factor
 
-        # --- Regen: randomly boost 200 cells (vectorized) ---
-        xs = np.random.randint(0, w, size=200)
-        ys = np.random.randint(0, h, size=200)
+        # --- Regen: boost FOOD_REGEN_SPREAD cells (vectorized) ---
+        # 30% of regen happens near nutrient clusters (hotspots),
+        # 70% is spread randomly across the field.
+        xs = np.random.randint(0, w, size=FOOD_REGEN_SPREAD)
+        ys = np.random.randint(0, h, size=FOOD_REGEN_SPREAD)
         regen_amount = effective_regen * dt
+        # Nutrient-cluster hotspots: concentrated regen
+        for cx, cy, cl_amount in self.nutrient_clusters:
+            if cl_amount > CORPSE_NUTRIENT_MIN_AMOUNT and 0 <= cx < w and 0 <= cy < h:
+                # Radius around cluster: cells within FOOD_CLUSTER_RADIUS get boosted regen
+                rx = np.random.randint(
+                    max(0, cx - FOOD_CLUSTER_RADIUS), min(w, cx + FOOD_CLUSTER_RADIUS + 1),
+                    size=max(1, int(FOOD_REGEN_SPREAD * FOOD_CLUSTER_CHANCE)),
+                )
+                ry = np.random.randint(
+                    max(0, cy - FOOD_CLUSTER_RADIUS), min(h, cy + FOOD_CLUSTER_RADIUS + 1),
+                    size=max(1, int(FOOD_REGEN_SPREAD * FOOD_CLUSTER_CHANCE)),
+                )
+                d[rx, ry] = np.minimum(1.0, d[rx, ry] + regen_amount * 1.5)
+        # Random regen across the field
         d[xs, ys] = np.minimum(1.0, d[xs, ys] + regen_amount)
 
         # --- Diffusion: spread energy between random neighbours (vectorized) ---
@@ -277,13 +301,13 @@ class ResourceField:
         # Nutrient-cluster boost
         for i, (cx, cy, cl_amount) in enumerate(self.nutrient_clusters):
             if (
-                cl_amount > 0.1
+                cl_amount > CORPSE_NUTRIENT_MIN_AMOUNT
                 and abs(cx - x) + abs(cy - y) <= CORPSE_NUTRIENT_BOOST_RADIUS
             ):
-                multiplier = 2.0
+                multiplier = CORPSE_NUTRIENT_BOOST_MULT
                 consumed = min(cl_amount, amt * 0.5)
                 self.nutrient_clusters[i][2] -= consumed
-                t += consumed * 0.3
+                t += consumed * CORPSE_NUTRIENT_EXTRA_ENERGY
                 break
 
         return t * multiplier
@@ -317,7 +341,7 @@ class ResourceField:
 
         # Highlight nutrient clusters
         for cx, cy, amount in self.nutrient_clusters:
-            if 0 <= cx < w and 0 <= cy < h and amount > 0.1:
+            if 0 <= cx < w and 0 <= cy < h and amount > CORPSE_NUTRIENT_MIN_AMOUNT:
                 it = int(min(255, amount * 30))
                 r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4))
                 pygame.draw.circle(self._fsurf, (it, it // 2, 0), (cx, cy), max(1, r))

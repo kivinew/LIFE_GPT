@@ -384,8 +384,9 @@ def main():
     for s, k in zip(sliders, ["speed", "sense", "mass", "metabolism", "divide_chance"]):
         s.label_key = k
 
-    sl_diet = SliderInt(COL_LX, 248, COL_W, tr("diet"), 0, 2, 0, labels=["Ф", "З", "П"])
-    sl_interact = Slider(COL_LX, 287, COL_W, tr("interact"), INTERACT_MIN, 1.0, 0.5)
+    sl_interact = Slider(COL_LX, 248, COL_W, tr("interact"), INTERACT_MIN, 1.0, 0.5)
+    sl_diet_rect = pygame.Rect(COL_LX, 287, COL_W, 20)
+    sl_diet_val = 0
     sl_zoophagy = Slider(
         COL_LX,
         327,
@@ -433,6 +434,7 @@ def main():
         labels=["-10°C", "13°C", "35°C"],
     )
     sl_temp._bias = 0.0
+    sl_food_lifetime = Slider(COL_LX, 559, COL_W, tr("food_lifetime"), 500, 6000, 3000)
     sl_diffuse = Slider(COL_LX, 597, COL_W, tr("food_diffuse"), 0.005, 0.2, 0.06)
     sl_time = Slider(COL_LX, 627, COL_W, tr("time_scale"), 0.1, 5.0, 1.0)
     sl_sfx = Slider(COL_RX, 726, COL_W, tr("sfx"), 0.0, 1.0, 0.1)
@@ -552,7 +554,7 @@ def main():
         sfx_volume_increasing=sfx_volume_increasing,
         music_volume_increasing=music_volume_increasing,
         sliders=sliders,
-        sl_diet=sl_diet,
+        sl_diet_val=sl_diet_val,
         sl_interact=sl_interact,
         sl_dmg=sl_dmg,
         sl_regen=sl_regen,
@@ -560,6 +562,7 @@ def main():
         sl_zoophagy=sl_zoophagy,
         sl_diffuse=sl_diffuse,
         sl_time=sl_time,
+        sl_food_lifetime=sl_food_lifetime,
         sl_sfx=sl_sfx,
         sl_music=sl_music,
         cam_x=cam_x,
@@ -568,7 +571,7 @@ def main():
     )
 
     # ── Main loop ──────────────────────────────────────────────────────
-    prev_diet = int(sl_diet.val)
+    prev_diet = sl_diet_val
     regen_base = sl_regen.val  # user-set base % (effective % is shown on the slider)
     while running:
         mx, my = pygame.mouse.get_pos()
@@ -672,9 +675,9 @@ def main():
                         if sliders[1].drag:
                             c.genome.sense = sliders[1].val
                         c.refresh_class()
-            sl_diet.handle(e)
-            if int(sl_diet.val) != prev_diet:
-                prev_diet = int(sl_diet.val)
+            if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 and sl_diet_rect.collidepoint(e.pos):
+                sl_diet_val = (sl_diet_val + 1) % 3
+                prev_diet = sl_diet_val
                 sliders[0].val = DIET_DEFAULT_SPEED[prev_diet]
                 sliders[1].val = DIET_DEFAULT_SENSE[prev_diet]
             sl_interact.handle(e)
@@ -693,6 +696,7 @@ def main():
             sl_zoophagy.handle(e)
             sl_diffuse.handle(e)
             sl_time.handle(e)
+            sl_food_lifetime.handle(e)
             sl_sfx.handle(e)
             sl_music.handle(e)
 
@@ -722,7 +726,7 @@ def main():
                     sel_cell = _apply_selection(cells, hit, shift, alt)
                     st.sel_cell = sel_cell
                 elif in_world and add_mode and len(cells) < MAX_CELLS:
-                    diet = int(sl_diet.val)
+                    diet = sl_diet_val
                     spd = sliders[0].val
                     sns = sliders[1].val
                     mass = sliders[2].val
@@ -788,6 +792,7 @@ def main():
         sfx_volume = st.sfx_volume
         sfx_volume_increasing = st.sfx_volume_increasing
         music_volume_increasing = st.music_volume_increasing
+        sl_diet_val = st.sl_diet_val
 
         # Music fade-in: gradually raise volume from 0 to target over 5 seconds
         if music_fade_timer < music_fade_duration:
@@ -834,7 +839,8 @@ def main():
             # Field update
             field.diff = sl_diffuse.val
             field.zoophagy_mult = sl_zoophagy.val
-            field.step(dt, len(cells))
+            food_decay_rate = 1.0 / max(1.0, sl_food_lifetime.val)
+            field.step(dt, len(cells), decay_rate=food_decay_rate)
 
             # Simulation
             if _HAVE_SIM_CORE:
@@ -968,7 +974,9 @@ def main():
 
                 for s in sliders:
                     s.draw(frame_surface, font)
-                sl_diet.draw(frame_surface, font)
+                diet_label = font.render(f"{tr('diet')}: {diet_labels[sl_diet_val]}", True, diet_colors[sl_diet_val])
+                frame_surface.blit(diet_label, (sl_diet_rect.x, sl_diet_rect.y - 12))
+                pygame.draw.rect(frame_surface, diet_colors[sl_diet_val], sl_diet_rect, 1, 4)
                 sl_interact.draw(frame_surface, font)
                 sl_zoophagy.draw(frame_surface, font)
                 for s in sl_dmg:
@@ -1063,12 +1071,17 @@ def main():
 
         draw_block(68, 286, tr("genes"))
         draw_block(356, 98, tr("damage"))
-        draw_block(456, 185, tr("environment"))
+        draw_block(456, 215, tr("environment"))
 
         # ── UI: Sliders & labels ─────────────────────────────────────────
         for s in sliders:
             s.draw(screen, font)
-        sl_diet.draw(screen, font)
+        # Diet toggle
+        diet_labels = ["Ф", "З", "П"]
+        diet_colors = [diet_color(PHOT, 10), diet_color(ZOOP, 10), diet_color(POLY, 10)]
+        diet_label = font.render(f"{tr('diet')}: {diet_labels[sl_diet_val]}", True, diet_colors[sl_diet_val])
+        screen.blit(diet_label, (sl_diet_rect.x, sl_diet_rect.y - 12))
+        pygame.draw.rect(screen, diet_colors[sl_diet_val], sl_diet_rect, 1, 4)
         sl_interact.draw(screen, font)
         sl_zoophagy.draw(screen, font)
         for s in sl_dmg:
@@ -1077,6 +1090,7 @@ def main():
         sl_temp.draw(screen, font)
         sl_diffuse.draw(screen, font)
         sl_time.draw(screen, font)
+        sl_food_lifetime.draw(screen, font)
         sl_sfx.draw(screen, font)
         sl_music.draw(screen, font)
 

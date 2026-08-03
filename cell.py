@@ -1009,12 +1009,18 @@ class Cell:
     def draw_at(self, surf, dx, dy):
         x, y = int(dx), int(dy)
         r = max(3, int(2 + self.genome.mass * 1.5))
-        col = YEL if self.selected else self.color
+        col = YEL if self.selected else self.color[:3]
         energy_ratio = max(0.0, min(1.0, self.energy / self.max_energy))
-        dark = tuple(int(c * 0.3) for c in col[:3])
-        bright = col[:3]
-        blended = tuple(int(d + (b - d) * energy_ratio) for d, b in zip(dark, bright))
-        pygame.draw.circle(surf, blended, (x, y), r)
+        bright = tuple(int(c * (0.4 + 0.6 * energy_ratio)) for c in col)
+        dark = tuple(int(c * 0.2) for c in col)
+        ss = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
+        cx, cy = r + 2, r + 2
+        for ri in range(r, 0, -1):
+            t = ri / r
+            alpha = int(255 * (1.0 - t * t))
+            c = tuple(int(d + (b - d) * (1.0 - t)) for d, b in zip(dark, bright))
+            pygame.draw.circle(ss, (*c, alpha), (cx, cy), ri)
+        surf.blit(ss, (x - cx, y - cy))
         if self.selected:
             sr = int(self.genome.sense)
             ss = pygame.Surface((sr * 2, sr * 2), pygame.SRCALPHA)

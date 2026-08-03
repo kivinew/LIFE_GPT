@@ -39,7 +39,7 @@ class HotkeyState:
         "sfx_volume_increasing",
         "music_volume_increasing",
         "sliders",
-        "sl_diet",
+        "sl_diet_val",
         "sl_interact",
         "sl_dmg",
         "sl_regen",
@@ -47,6 +47,7 @@ class HotkeyState:
         "sl_zoophagy",
         "sl_diffuse",
         "sl_time",
+        "sl_food_lifetime",
         "sl_sfx",
         "sl_music",
         "cam_x",
@@ -133,7 +134,7 @@ def _set_interact(cells, value):
 
 def _set_diet(st, diet):
     # Class defaults: speed/sense follow the diet (PHOT min, POLY mid, ZOOP max)
-    st.sl_diet.val = diet
+    st.sl_diet_val = diet
     st.sliders[0].val = DIET_DEFAULT_SPEED[diet]
     st.sliders[1].val = DIET_DEFAULT_SENSE[diet]
     for c in st.cells:
@@ -161,7 +162,6 @@ def _set_sense(cells, delta):
 def _apply_labels(st):
     for s in st.sliders:
         s.label = tr(s.label_key)
-    st.sl_diet.label = tr("diet")
     st.sl_interact.label = tr("interact")
     for i, s in enumerate(st.sl_dmg):
         s.label = [tr("dmg_phot"), tr("dmg_zoo"), tr("dmg_poly")][i]
@@ -170,6 +170,7 @@ def _apply_labels(st):
     st.sl_zoophagy.label = tr("zoophagy")
     st.sl_diffuse.label = tr("food_diffuse")
     st.sl_time.label = tr("time_scale")
+    st.sl_food_lifetime.label = tr("food_lifetime")
     st.sl_sfx.label = tr("sfx")
     st.sl_music.label = tr("music")
 
