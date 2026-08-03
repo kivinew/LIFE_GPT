@@ -92,6 +92,8 @@ from config import (
     CORPSE_EAT_RADIUS,
     CORPSE_EAT_RATE,
     CORPSE_EAT_EFFICIENCY,
+    CORPSE_ATTRACT_RADIUS,
+    CORPSE_SCAVENGE_RATE,
     SEASON_ORDER,
     SEASON_LENGTH,
     SEASON_FACTORS,
@@ -550,6 +552,8 @@ def main():
     follow_mode = False
     show_stats = True
     show_memory = False
+    show_energy_bars = True
+    show_level_bars = True
     time_lapse_mode = False
     time_lapse_active = False
     time_lapse_timer = 0
@@ -567,6 +571,8 @@ def main():
         add_mode=add_mode,
         time_lapse_mode=time_lapse_mode,
         show_stats=show_stats,
+        show_energy_bars=show_energy_bars,
+        show_level_bars=show_level_bars,
         follow_mode=follow_mode,
         sel_cell=sel_cell,
         running=running,
@@ -813,6 +819,12 @@ def main():
         sfx_volume_increasing = st.sfx_volume_increasing
         music_volume_increasing = st.music_volume_increasing
         sl_diet_val = st.sl_diet_val
+        show_energy_bars = st.show_energy_bars
+        show_level_bars = st.show_level_bars
+
+        # Sync display toggles to cell module
+        cell._show_energy_bars = show_energy_bars
+        cell._show_level_bars = show_level_bars
 
         # Music fade-in: gradually raise volume from 0 to target over 5 seconds
         if music_fade_timer < music_fade_duration:
@@ -1152,6 +1164,8 @@ def main():
                 tr("hotkey_ud"),
                 tr("hotkey_x"),
                 tr("hotkey_d"),
+                tr("hotkey_e"),
+                tr("hotkey_v"),
                 tr("hotkey_m"),
                 tr("hotkey_tab"),
                 tr("hotkey_z"),

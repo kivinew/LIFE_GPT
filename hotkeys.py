@@ -32,6 +32,8 @@ class HotkeyState:
         "add_mode",
         "time_lapse_mode",
         "show_stats",
+        "show_energy_bars",
+        "show_level_bars",
         "follow_mode",
         "sel_cell",
         "running",
@@ -321,6 +323,13 @@ def handle_key(e, st):
         st.follow_mode = False
         if st.sel_cell is not None:
             st.cam_x, st.cam_y = st.sel_cell.x, st.sel_cell.y
+
+    elif k == pygame.K_e:
+        st.show_energy_bars = not st.show_energy_bars
+        print(f"Energy bars: {'ON' if st.show_energy_bars else 'OFF'}")
+    elif k == pygame.K_v:
+        st.show_level_bars = not st.show_level_bars
+        print(f"Level bars: {'ON' if st.show_level_bars else 'OFF'}")
 
     elif k == pygame.K_ESCAPE:
         if _selected(st.cells):

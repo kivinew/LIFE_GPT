@@ -3,6 +3,7 @@
 import numpy as np
 import pygame
 import random
+import math
 from config import (
     W,
     H,
@@ -339,12 +340,28 @@ class ResourceField:
                 b = int(hv * 255)
                 buf[hx, hy] = (b // 2, b, 0)
 
-        # Highlight nutrient clusters
+        # Highlight nutrient clusters — irregular organic shape
         for cx, cy, amount in self.nutrient_clusters:
             if 0 <= cx < w and 0 <= cy < h and amount > CORPSE_NUTRIENT_MIN_AMOUNT:
                 it = int(min(255, amount * 30))
                 r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4))
-                pygame.draw.circle(self._fsurf, (it, it // 2, 0), (cx, cy), max(1, r))
+                # Draw an irregular organic blob instead of a perfect circle
+                ss = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
+                ccx, ccy = r + 2, r + 2
+                # Use the cluster amount as a deterministic seed for shape irregularity
+                seed = int(amount * 1000) % 10000
+                for ri in range(r, 0, -1):
+                    t = ri / r
+                    alpha = int(255 * (1.0 - t * t) * 0.7)
+                    # Irregular radius: modulate with sin/cos at different frequencies
+                    irregular = 1.0 + 0.35 * (
+                        math.sin(seed * 0.013 + ri * 0.7) * 0.5
+                        + math.cos(seed * 0.017 + ri * 0.5) * 0.3
+                        + math.sin(seed * 0.023 + ri * 1.1) * 0.2
+                    )
+                    rr = max(1, int(ri * irregular))
+                    pygame.draw.circle(ss, (it, it // 2, 0, alpha), (ccx, ccy), rr)
+                surf.blit(ss, (cx - ccx, cy - ccy))
 
         del buf
         surf.blit(self._fsurf, (0, 0))
