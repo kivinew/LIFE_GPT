@@ -199,20 +199,23 @@ class ResourceField:
     # ── Temperature effects on regeneration ──
     def _get_temp_regen_factor(self) -> float:
         """Temperature multiplier for food regeneration.
-        Optimal at ~0.6 (temperate), decreases at extremes."""
+        Optimal at ~0.6 (temperate), decreases at extremes.
+        Below 0°C (temp < 0.222) no regeneration."""
         temp = self.temperature
-        if temp < 0.3:
-            # Cold: slow regen, smooth up to the temperate branch (0.6 at 0.3)
-            return 0.3 + temp  # 0.3 at 0.0, 0.6 at 0.3
+        FREEZE = 0.222  # 0°C in internal units (-10 + 0.222*45 ≈ 0)
+        if temp < FREEZE:
+            return 0.0
+        elif temp < 0.3:
+            # Cold: slow regen, smooth up to the temperate branch
+            return 0.3 + temp
         elif temp > 0.8:
             # Hot: slow regen (desertification)
-            return 1.2 - temp * 0.5  # 0.8 at 0.8, 0.7 at 1.0
+            return 1.2 - temp * 0.5
         else:
             # Temperate: optimal regen
-            # Peak at 0.6 with smooth interpolation
             return 0.8 + 0.4 * (
                 1.0 - abs(temp - 0.6) / 0.2
-            )  # 1.2 at 0.6, 0.8 at 0.3/0.8
+            )
 
     def step(self, dt: float, current_cell_count: int) -> None:
         w, h = self.w, self.h

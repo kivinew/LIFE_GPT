@@ -223,9 +223,12 @@ def _select_in_rect(cells, wx0, wy0, wx1, wy1, shift):
 
 
 # ── Population-graph legend / palette toggles ─────────────────────────────
-LEGEND_GROUP_Y = 846
+LEGEND_GROUP_Y = 761
 _LEGEND_GRID_Y = LEGEND_GROUP_Y + 26
 LEGEND_GRID_RECT = pygame.Rect(COL_LX, _LEGEND_GRID_Y, COL_W, 22)
+_LEGEND_GRID_RECT_PHOT = pygame.Rect(COL_LX, _LEGEND_GRID_Y, COL_W, 22)
+_LEGEND_GRID_RECT_ZOOP = pygame.Rect(COL_LX, _LEGEND_GRID_Y + 28, COL_W, 22)
+_LEGEND_GRID_RECT_POLY = pygame.Rect(COL_LX, _LEGEND_GRID_Y + 56, COL_W, 22)
 _LEGEND_DOT_R = 10
 _LEGEND_CLASS_R = 6
 
@@ -252,23 +255,28 @@ def _palette_group_dots():
     return out
 
 
-def _palette_class_grid(pop_graph, dot_r=_LEGEND_CLASS_R, gap=8):
+def _palette_class_grid(pop_graph, diet_filter=None, grid_rect=None, dot_r=_LEGEND_CLASS_R, gap=8):
     """Return (entries, offset, total) for the visible scroll window of classes.
 
     entries = list of (cls, rect, color, visible).
+    If diet_filter is given, only classes of that diet are included.
     """
-    cols = max(1, (LEGEND_GRID_RECT.w - 2 * gap) // (2 * dot_r + gap))
-    rows = max(1, LEGEND_GRID_RECT.h // (2 * dot_r + gap))
-    entries = pop_graph.legend_entries()
-    total = len(entries)
+    if grid_rect is None:
+        grid_rect = LEGEND_GRID_RECT
+    cols = max(1, (grid_rect.w - 2 * gap) // (2 * dot_r + gap))
+    rows = max(1, grid_rect.h // (2 * dot_r + gap))
+    all_entries = pop_graph.legend_entries()
+    if diet_filter is not None:
+        all_entries = [(cls, col, vis) for cls, col, vis in all_entries if pop_graph.cls_diet.get(cls) == diet_filter]
+    total = len(all_entries)
     per_page = cols * rows if total else 1
     offset = max(0, min(pop_graph.legend_offset, max(0, total - per_page)))
-    page = entries[offset : offset + per_page]
+    page = all_entries[offset : offset + per_page]
     out = []
     for i, (cls, color, visible) in enumerate(page):
         col, row = i % cols, i // cols
-        cx = LEGEND_GRID_RECT.x + gap + col * (2 * dot_r + gap) + dot_r
-        cy = LEGEND_GRID_RECT.y + gap + row * (2 * dot_r + gap) + dot_r
+        cx = grid_rect.x + gap + col * (2 * dot_r + gap) + dot_r
+        cy = grid_rect.y + gap + row * (2 * dot_r + gap) + dot_r
         out.append(
             (
                 cls,
@@ -289,10 +297,11 @@ def _palette_click(pop_graph, pos):
             else:
                 pop_graph.toggle_diet(kind)
             return True
-    for cls, rect, color, visible in _palette_class_grid(pop_graph)[0]:
-        if rect.collidepoint(pos):
-            pop_graph.toggle_cls(cls)
-            return True
+    for grid_rect in [_LEGEND_GRID_RECT_PHOT, _LEGEND_GRID_RECT_ZOOP, _LEGEND_GRID_RECT_POLY]:
+        for cls, rect, color, visible in _palette_class_grid(pop_graph, grid_rect=grid_rect)[0]:
+            if rect.collidepoint(pos):
+                pop_graph.toggle_cls(cls)
+                return True
     return False
 
 
@@ -476,7 +485,7 @@ def main():
     cell._sounds_enabled = True
     cell._sfx_volume = sl_sfx.val
 
-    cam_x, cam_y, zoom = 0.0, 0.0, 1.0
+    cam_x, cam_y, zoom = (W - SB) / 2, H / 2, 1.0
     prev_zoom = 1.0
 
     world_w, world_h = W - SB, H
@@ -572,7 +581,10 @@ def main():
             # ── Mouse wheel: palette scroll or camera zoom ──────────────────
             if e.type == pygame.MOUSEWHEEL:
                 pmx, pmy = pygame.mouse.get_pos()
-                over_palette = LEGEND_GRID_RECT.collidepoint(pmx, pmy) or any(
+                over_palette = any(
+                    r.collidepoint(pmx, pmy)
+                    for r in [_LEGEND_GRID_RECT_PHOT, _LEGEND_GRID_RECT_ZOOP, _LEGEND_GRID_RECT_POLY]
+                ) or any(
                     r.collidepoint(pmx, pmy) for *_, r in _palette_group_dots()
                 )
                 if over_palette:
@@ -1171,11 +1183,11 @@ def main():
         screen.blit(map_surf, (map_rect.x, map_rect.y))
 
         # ── UI: Population graph ────────────────────────────────────────
-        pygame.draw.rect(screen, GRAY, (COL_LX - 5, 732, COL_W + 10, 108), 1, 4)
+        pygame.draw.rect(screen, GRAY, (COL_LX - 5, 651, COL_W + 10, 108), 1, 4)
         gt = font.render(tr("population_graph"), True, CYAN)
-        screen.blit(gt, (COL_LX + COL_W // 2 - gt.get_width() // 2, 737))
+        screen.blit(gt, (COL_LX + COL_W // 2 - gt.get_width() // 2, 656))
         pop_graph.update(tick, cells)
-        pop_graph.draw(screen, COL_LX, 758, COL_W, 76)
+        pop_graph.draw(screen, COL_LX, 677, COL_W, 76)
 
         # ── UI: Legend / palette (drawn AFTER graph so it's on top) ─────
         group_labels = {
@@ -1212,23 +1224,24 @@ def main():
                     pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
             surf = tiny.render(label, True, WHITE)
             screen.blit(surf, (cx - surf.get_width() // 2, cy + 14))
-        # Scrollable per-class palette
-        pal_entries, offset, total = _palette_class_grid(pop_graph)
-        for cls, rect, color, visible in pal_entries:
-            if visible:
-                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R)
-            else:
-                pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R, 1)
-                r = _LEGEND_CLASS_R - 2
-                cx, cy = rect.center
-                pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 1)
-                pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 1)
-        if total > 0:
-            label = f"{tr('classes')}: {offset + 1}-{min(offset + len(pal_entries), total)} / {total}"
-            ts = tiny.render(label, True, WHITE)
-            screen.blit(
-                ts, (LEGEND_GRID_RECT.x, LEGEND_GRID_RECT.y + LEGEND_GRID_RECT.h + 2)
-            )
+        # Scrollable per-class palette — three groups by diet
+        for diet_id, grid_rect, label_key in [
+            (PHOT, _LEGEND_GRID_RECT_PHOT, "diet_phot"),
+            (ZOOP, _LEGEND_GRID_RECT_ZOOP, "diet_zoop"),
+            (POLY, _LEGEND_GRID_RECT_POLY, "diet_poly"),
+        ]:
+            diet_label = tiny.render(tr(label_key), True, diet_color(diet_id, 10))
+            screen.blit(diet_label, (grid_rect.x, grid_rect.y - 12))
+            pal_entries, offset, total = _palette_class_grid(pop_graph, diet_filter=diet_id, grid_rect=grid_rect)
+            for cls, rect, color, visible in pal_entries:
+                if visible:
+                    pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R)
+                else:
+                    pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R, 1)
+                    r = _LEGEND_CLASS_R - 2
+                    cx, cy = rect.center
+                    pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 1)
+                    pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 1)
 
         # ── SFX / Music volume indicators ───────────────────────────────
         pygame.draw.rect(screen, GRAY, (COL_RX - 5, 696, COL_W + 10, 90), 1, 4)
