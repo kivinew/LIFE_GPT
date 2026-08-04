@@ -90,7 +90,7 @@ MAX_CELLS = 500
 | ↑/↓ | Adjust sense |
 | X | Mutate selected |
 | D | Delete selected |
-| E | Toggle energy bars |
+| G | Toggle energy bars |
 | V | Toggle level bars |
 | Z | Zoom to selected cell |
 | B | Toggle follow camera |

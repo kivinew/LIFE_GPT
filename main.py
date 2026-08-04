@@ -1164,7 +1164,7 @@ def main():
                 tr("hotkey_ud"),
                 tr("hotkey_x"),
                 tr("hotkey_d"),
-                tr("hotkey_e"),
+                tr("hotkey_g"),
                 tr("hotkey_v"),
                 tr("hotkey_m"),
                 tr("hotkey_tab"),

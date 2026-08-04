@@ -324,7 +324,7 @@ def handle_key(e, st):
         if st.sel_cell is not None:
             st.cam_x, st.cam_y = st.sel_cell.x, st.sel_cell.y
 
-    elif k == pygame.K_e:
+    elif k == pygame.K_g:
         st.show_energy_bars = not st.show_energy_bars
         print(f"Energy bars: {'ON' if st.show_energy_bars else 'OFF'}")
     elif k == pygame.K_v:
