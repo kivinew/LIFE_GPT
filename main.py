@@ -1177,46 +1177,6 @@ def main():
                 screen.blit(surf, (COL_RX + 5, panel_y + 28 + i * 16))
 
 
-        # ── UI: Stats (top-left) ─────────────────────────────────────────
-        if show_stats:
-            import cell
-            food_pct = field.data.mean() * 100
-            stats = [
-                f"{tr('cells')}: {len(cells)}/{MAX_CELLS} ({tr('dead')}: {len(corpses)})",
-                f"{tr('tick')}: {tick}",
-                f"{tr('divisions')}: {cell.divisions}",
-                f"{tr('food')}: {food_pct:.1f}%",
-                f"{tr('season')}: {tr(season_name)}",
-                f"{tr('temp')}: {-10.0 + field.temperature * 45.0:.1f}°C",
-                f"{tr('zoom')}: {zoom:.2f}x",
-                f"{tr('paused')}: {'Yes' if paused else 'No'}",
-                tr("follow").format("On" if follow_mode else "Off"),
-                f"{tr('timelapse')}: {'On' if time_lapse_mode else 'Off'}",
-            ]
-            # ── UI: Memory/Threat/Coop display (if show_memory enabled) ─────────────────────────
-            if show_memory and sel_cell:
-                if hasattr(sel_cell, 'memory'):
-                    mem_stats = []
-                    # Add general memory info
-                    mem_stats.append(f"Memory classes: {len(sel_cell.memory)}")
-                    # Add detailed threat/coop info for each class learned
-                    if hasattr(sel_cell.memory, 'summary'):
-                        summary = sel_cell.memory.summary()
-                        for cls, (threat, coop, encounters) in summary.items():
-                            mem_stats.append(f"  Class {cls}: Threat {threat:.2f}, Coop {coop:.2f}, Encounters {encounters}")
-                    else:
-                        mem_stats.append("  No summary method")
-                    # Display memory info
-                    for i, line in enumerate(mem_stats):
-                        surf = font.render(line, True, (200, 255, 200))
-                        screen.blit(surf, (10, 10 + (len(stats) + i) * 22))
-                else:
-                    surf = font.render("No memory for selected cell", True, (200, 200, 200))
-                    screen.blit(surf, (10, 10 + len(stats) * 22))
-            for i, line in enumerate(stats):
-                surf = font.render(line, True, WHITE)
-                screen.blit(surf, (10, 10 + i * 22))
-
         # ── UI: Mini-map (right column) ─────────────────────────────────
         map_surf = pygame.Surface((map_size, map_size))
         if hasattr(field, "_fsurf"):
@@ -1256,6 +1216,46 @@ def main():
         mt = small.render(tr("minimap"), True, CYAN)
         screen.blit(mt, (COL_RX + COL_W // 2 - mt.get_width() // 2, 435))
         screen.blit(map_surf, (map_rect.x, map_rect.y))
+
+        # ── UI: Stats (top-left) ─────────────────────────────────────────
+        if show_stats:
+            import cell
+            food_pct = field.data.mean() * 100
+            stats = [
+                f"{tr('cells')}: {len(cells)}/{MAX_CELLS} ({tr('dead')}: {len(corpses)})",
+                f"{tr('tick')}: {tick}",
+                f"{tr('divisions')}: {cell.divisions}",
+                f"{tr('food')}: {food_pct:.1f}%",
+                f"{tr('season')}: {tr(season_name)}",
+                f"{tr('temp')}: {-10.0 + field.temperature * 45.0:.1f}°C",
+                f"{tr('zoom')}: {zoom:.2f}x",
+                f"{tr('paused')}: {'Yes' if paused else 'No'}",
+                tr("follow").format("On" if follow_mode else "Off"),
+                f"{tr('timelapse')}: {'On' if time_lapse_mode else 'Off'}",
+            ]
+            # ── UI: Memory/Threat/Coop display (if show_memory enabled) ─────────────────────────
+            if show_memory and sel_cell:
+                if hasattr(sel_cell, 'memory'):
+                    mem_stats = []
+                    # Add general memory info
+                    mem_stats.append(f"Memory classes: {len(sel_cell.memory)}")
+                    # Add detailed threat/coop info for each class learned
+                    if hasattr(sel_cell.memory, 'summary'):
+                        summary = sel_cell.memory.summary()
+                        for cls, (threat, coop, encounters) in summary.items():
+                            mem_stats.append(f"  Class {cls}: Threat {threat:.2f}, Coop {coop:.2f}, Encounters {encounters}")
+                    else:
+                        mem_stats.append("  No summary method")
+                    # Display memory info
+                    for i, line in enumerate(mem_stats):
+                        surf = font.render(line, True, (200, 255, 200))
+                        screen.blit(surf, (10, 10 + (len(stats) + i) * 22))
+                else:
+                    surf = font.render("No memory for selected cell", True, (200, 200, 200))
+                    screen.blit(surf, (10, 10 + len(stats) * 22))
+            for i, line in enumerate(stats):
+                surf = font.render(line, True, WHITE)
+                screen.blit(surf, (10, 10 + i * 22))
 
         # ── UI: Population graph ────────────────────────────────────────
         pygame.draw.rect(screen, GRAY, (COL_LX - 5, 651, COL_W + 10, 108), 1, 4)
