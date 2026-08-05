@@ -355,11 +355,11 @@ class ResourceField:
                     alpha = int(255 * (1.0 - t * t) * 0.75)
                     # Irregular radius: modulate with sin/cos at different frequencies
                     # creates an organic, non-circular puddle shape
-                    irregular = 1.0 + 0.4 * (
+                    irregular = (1.0 + 0.4 * (
                         math.sin(seed * 0.013 + ri * 0.7) * 0.5
                         + math.cos(seed * 0.017 + ri * 0.5) * 0.3
                         + math.sin(seed * 0.023 + ri * 1.1) * 0.2
-                    )
+                    ))
                     rr = max(1, int(ri * irregular))
                     pygame.draw.circle(ss, (it, it // 2, 0, alpha), (ccx, ccy), rr)
                 surf.blit(ss, (cx - ccx, cy - ccy))
