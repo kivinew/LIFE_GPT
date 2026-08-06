@@ -225,7 +225,7 @@ def _select_in_rect(cells, wx0, wy0, wx1, wy1, shift):
 
 
 # ── Population-graph legend / palette toggles ─────────────────────────────
-LEGEND_GROUP_Y = 761
+LEGEND_GROUP_Y = 799
 _LEGEND_GRID_Y = LEGEND_GROUP_Y + 26
 LEGEND_GRID_RECT = pygame.Rect(COL_LX, _LEGEND_GRID_Y, COL_W, 22)
 _LEGEND_GRID_RECT_PHOT = pygame.Rect(COL_LX, _LEGEND_GRID_Y, COL_W, 22)
@@ -457,8 +457,9 @@ def main():
     )
     sl_temp._bias = 0.0
     sl_food_lifetime = Slider(COL_LX, 559, COL_W, tr("food_lifetime"), 500, 6000, 3000)
-    sl_diffuse = Slider(COL_LX, 597, COL_W, tr("food_diffuse"), 0.005, 0.2, 0.06)
-    sl_time = Slider(COL_LX, 627, COL_W, tr("time_scale"), 0.1, 5.0, 1.0)
+    sl_food_areola_lifetime = Slider(COL_LX, 597, COL_W, tr("food_areola_lifetime"), 100, 2000, 500)
+    sl_diffuse = Slider(COL_LX, 635, COL_W, tr("food_diffuse"), 0.005, 0.2, 0.06)
+    sl_time = Slider(COL_LX, 673, COL_W, tr("time_scale"), 0.1, 5.0, 1.0)
     sl_sfx = Slider(COL_RX, 726, COL_W, tr("sfx"), 0.0, 1.0, 0.1)
     sl_music = Slider(COL_RX, 766, COL_W, tr("music"), 0.0, 1.0, 0.8)
 
@@ -589,6 +590,7 @@ def main():
         sl_diffuse=sl_diffuse,
         sl_time=sl_time,
         sl_food_lifetime=sl_food_lifetime,
+        sl_food_areola_lifetime=sl_food_areola_lifetime,
         sl_sfx=sl_sfx,
         sl_music=sl_music,
         cam_x=cam_x,
@@ -723,6 +725,7 @@ def main():
             sl_diffuse.handle(e)
             sl_time.handle(e)
             sl_food_lifetime.handle(e)
+            sl_food_areola_lifetime.handle(e)
             sl_sfx.handle(e)
             sl_music.handle(e)
 
@@ -872,7 +875,7 @@ def main():
             field.diff = sl_diffuse.val
             field.zoophagy_mult = sl_zoophagy.val
             food_decay_rate = 1.0 / max(1.0, sl_food_lifetime.val)
-            field.step(dt, len(cells), decay_rate=food_decay_rate)
+            field.step(dt, len(cells), decay_rate=food_decay_rate, nutrient_fade=1.0 - 50.0 / sl_food_areola_lifetime.val)
 
             # Simulation
             if _HAVE_SIM_CORE:
@@ -1103,17 +1106,24 @@ def main():
 
         draw_block(68, 286, tr("genes"))
         draw_block(356, 98, tr("damage"))
-        draw_block(456, 215, tr("environment"))
+        draw_block(456, 253, tr("environment"))
 
         # ── UI: Sliders & labels ─────────────────────────────────────────
         for s in sliders:
             s.draw(screen, font)
-        # Diet toggle
+        # Diet toggle (checkboxes)
         diet_labels = ["Ф", "З", "П"]
         diet_colors = [diet_color(PHOT, 10), diet_color(ZOOP, 10), diet_color(POLY, 10)]
-        diet_label = font.render(f"{tr('diet')}: {diet_labels[sl_diet_val]}", True, diet_colors[sl_diet_val])
-        screen.blit(diet_label, (sl_diet_rect.x, sl_diet_rect.y - 12))
-        pygame.draw.rect(screen, diet_colors[sl_diet_val], sl_diet_rect, 1, 4)
+        diet_title = font.render(tr("diet"), True, CYAN)
+        screen.blit(diet_title, (sl_diet_rect.x, sl_diet_rect.y - 14))
+        for i, (label, color) in enumerate(zip(diet_labels, diet_colors)):
+            cb_x = sl_diet_rect.x + i * 50
+            cb_rect = pygame.Rect(cb_x, sl_diet_rect.y, 14, 14)
+            pygame.draw.rect(screen, color, cb_rect, 1, 2)
+            if sl_diet_val == i:
+                pygame.draw.rect(screen, color, (cb_x + 3, sl_diet_rect.y + 3, 8, 8), 0, 1)
+            lbl = tiny.render(label, True, color if sl_diet_val == i else GRAY)
+            screen.blit(lbl, (cb_x + 18, sl_diet_rect.y))
         sl_interact.draw(screen, font)
         sl_zoophagy.draw(screen, font)
         for s in sl_dmg:
@@ -1123,6 +1133,7 @@ def main():
         sl_diffuse.draw(screen, font)
         sl_time.draw(screen, font)
         sl_food_lifetime.draw(screen, font)
+        sl_food_areola_lifetime.draw(screen, font)
         sl_sfx.draw(screen, font)
         sl_music.draw(screen, font)
 
@@ -1172,9 +1183,14 @@ def main():
                 tr("hotkey_b"),
                 tr("hotkey_l"),
             ]
+            col_w = COL_W // 2
             for i, hk in enumerate(hotkey_lines):
-                surf = small.render(hk, True, WHITE)
-                screen.blit(surf, (COL_RX + 5, panel_y + 28 + i * 16))
+                col = i % 2
+                row = i // 2
+                x = COL_RX + 5 + col * col_w
+                y = panel_y + 28 + row * 14
+                surf = tiny.render(hk, True, WHITE)
+                screen.blit(surf, (x, y))
 
 
         # ── UI: Mini-map (right column) ─────────────────────────────────
@@ -1296,11 +1312,11 @@ def main():
                 screen.blit(surf, (10, 10 + i * 22))
 
         # ── UI: Population graph ────────────────────────────────────────
-        pygame.draw.rect(screen, GRAY, (COL_LX - 5, 651, COL_W + 10, 108), 1, 4)
+        pygame.draw.rect(screen, GRAY, (COL_LX - 5, 689, COL_W + 10, 108), 1, 4)
         gt = font.render(tr("population_graph"), True, CYAN)
-        screen.blit(gt, (COL_LX + COL_W // 2 - gt.get_width() // 2, 656))
+        screen.blit(gt, (COL_LX + COL_W // 2 - gt.get_width() // 2, 694))
         pop_graph.update(tick, cells)
-        pop_graph.draw(screen, COL_LX, 677, COL_W, 76)
+        pop_graph.draw(screen, COL_LX, 715, COL_W, 76)
 
         # ── UI: Legend / palette (drawn AFTER graph so it's on top) ─────
         group_labels = {

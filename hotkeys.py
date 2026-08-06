@@ -50,6 +50,7 @@ class HotkeyState:
         "sl_diffuse",
         "sl_time",
         "sl_food_lifetime",
+        "sl_food_areola_lifetime",
         "sl_sfx",
         "sl_music",
         "cam_x",
@@ -173,6 +174,7 @@ def _apply_labels(st):
     st.sl_diffuse.label = tr("food_diffuse")
     st.sl_time.label = tr("time_scale")
     st.sl_food_lifetime.label = tr("food_lifetime")
+    st.sl_food_areola_lifetime.label = tr("food_areola_lifetime")
     st.sl_sfx.label = tr("sfx")
     st.sl_music.label = tr("music")
 

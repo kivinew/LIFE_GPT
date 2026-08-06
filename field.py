@@ -204,7 +204,36 @@ class ResourceField:
     def add_nutrient_cluster(self, x, y, amount) -> None:
         x, y = int(x), int(y)
         if 0 <= x < self.w and 0 <= y < self.h and amount > 0.01:
-            self.nutrient_clusters.append([x, y, amount])
+            # Precompute an irregular organic puddle mask for this cluster
+            # so the shape stays consistent across ticks (not recalculated each frame)
+            seed = int((x * 7 + y * 13 + amount * 1000)) % 10000
+            rng = np.random.RandomState(seed)
+            max_r = FOOD_CLUSTER_RADIUS
+            mask_size = max_r * 2 + 1
+            mx, my = np.ogrid[:mask_size, :mask_size]
+            dxm = mx - max_r
+            dym = my - max_r
+            dist_m = np.sqrt(dxm ** 2 + dym ** 2)
+            ang_m = np.arctan2(dym, dxm)
+            # Irregular radii per angle — organic water-stain shape
+            # Use 16 vertices with extreme radius variation (10% to 120% of max_r)
+            n_vertices = 16
+            vertex_angles = np.linspace(0, 2 * np.pi, n_vertices, endpoint=False)
+            # Extreme variation: some directions reach far, others retract sharply
+            vertex_radii = max_r * (0.1 + 1.1 * rng.rand(n_vertices))
+            # Apply per-vertex jitter for extra irregularity
+            vertex_jitter = 0.8 + 0.4 * rng.rand(n_vertices)
+            vertex_radii = vertex_radii * vertex_jitter
+            # Interpolate radius for each angle in the grid
+            ang_normalized = ((ang_m + np.pi) % (2 * np.pi))
+            seg = ((ang_normalized / (2 * np.pi)) * n_vertices).astype(int) % n_vertices
+            frac = ((ang_normalized / (2 * np.pi)) * n_vertices) - seg
+            accept_r = vertex_radii[seg] * (1 - frac) + vertex_radii[(seg + 1) % n_vertices] * frac
+            boundary_r = np.clip(accept_r, 1, max_r * 2)
+            # Store the precomputed mask and falloff
+            puddle_mask = (dist_m <= boundary_r).astype(np.float32)
+            falloff = np.clip(1.0 - dist_m / np.maximum(boundary_r, 1), 0, 1)
+            self.nutrient_clusters.append([x, y, amount, puddle_mask, falloff, max_r])
 
     # ── Temperature effects on regeneration ──
     def _get_temp_regen_factor(self) -> float:
@@ -216,7 +245,7 @@ class ResourceField:
             return 0.0
         return self.temperature
 
-    def step(self, dt: float, current_cell_count: int, decay_rate: float = None) -> None:
+    def step(self, dt: float, current_cell_count: int, decay_rate: float = None, nutrient_fade: float = None) -> None:
         w, h = self.w, self.h
         d = self.data
 
@@ -246,45 +275,23 @@ class ResourceField:
         xs = np.random.randint(0, w, size=FOOD_REGEN_SPREAD)
         ys = np.random.randint(0, h, size=FOOD_REGEN_SPREAD)
         regen_amount = effective_regen * dt
-        # Nutrient-cluster hotspots: concentrated regen in irregular organic shape
-        for cx, cy, cl_amount in self.nutrient_clusters:
+        # Nutrient-cluster hotspots: regen in irregular organic puddle shape
+        for cluster in self.nutrient_clusters:
+            cx, cy, cl_amount = cluster[0], cluster[1], cluster[2]
             if cl_amount > CORPSE_NUTRIENT_MIN_AMOUNT and 0 <= cx < w and 0 <= cy < h:
-                n = max(1, int(FOOD_REGEN_SPREAD * FOOD_CLUSTER_CHANCE * 3))
-                # Build an irregular organic puddle mask (like a water stain)
-                seed = int((cx * 7 + cy * 13 + cl_amount * 1000)) % 10000
-                rng = np.random.RandomState(seed)
-                max_r = FOOD_CLUSTER_RADIUS
-                # Polygon-based puddle shape: extreme radius variation for stretched form
-                angles = np.linspace(0, 2 * np.pi, 8, endpoint=False)
-                # Extreme radii: some directions stretch far, others retract
-                boundary_radii = max_r * (0.25 + 0.75 * rng.rand(8))
-                # Add secondary sinusoidal perturbation for fine organic detail
-                sin_mod = 0.3 + 0.45 * np.sin(angles * 3 + seed * 0.01)
-                boundary_radii = boundary_radii * (1.0 + sin_mod)
-                # Build the polygon vertices
-                poly_x = (cx + boundary_radii * np.cos(angles)).astype(int)
-                poly_y = (cy + boundary_radii * np.sin(angles)).astype(int)
-                # Generate random points within bounding box
-                bx0, bx1 = max(0, cx - max_r), min(w, cx + max_r + 1)
-                by0, by1 = max(0, cy - max_r), min(h, cy + max_r + 1)
-                rx = rng.randint(bx0, bx1, size=n * 2)
-                ry = rng.randint(by0, by1, size=n * 2)
-                dx = rx - cx
-                dy = ry - cy
-                dist = np.sqrt(dx ** 2 + dy ** 2)
-                # Compute per-angle acceptance radius by interpolating the polygon boundary
-                ang_rad = np.arctan2(dy, dx)
-                ang_deg = np.degrees(ang_rad) % 360
-                # Map angle to the nearest polygon vertex pair for interpolation
-                seg = (ang_deg / 45).astype(int) % 8  # 360/8 = 45 degrees per segment
-                seg_next = (seg + 1) % 8
-                # Interpolation weight
-                frac = (ang_deg % 45) / 45.0
-                accept_r = (boundary_radii[seg] * (1 - frac) + boundary_radii[seg_next] * frac)
-                mask = dist <= np.clip(accept_r, 1, max_r * 2)
-                rx = rx[mask][:n]
-                ry = ry[mask][:n]
-                d[rx, ry] = np.minimum(1.0, d[rx, ry] + regen_amount * 1.5)
+                # Use precomputed organic mask from add_nutrient_cluster
+                puddle_mask = cluster[3]
+                falloff = cluster[4]
+                max_r = cluster[5]
+                weighted = puddle_mask * falloff
+                # Map mask coordinates back to world coordinates
+                wx = np.clip(np.arange(cx - max_r, cx + max_r + 1), 0, w - 1)
+                wy = np.clip(np.arange(cy - max_r, cy + max_r + 1), 0, h - 1)
+                # Apply weighted regen directly to field using vectorized indexing
+                dw = weighted * regen_amount * 1.5
+                # Use numpy ix_ for proper 2D indexing: d[rows=wy, cols=wx]
+                W, H = np.ix_(wy, wx)
+                d[W, H] = np.minimum(1.0, d[W, H] + dw)
         # Random regen across the field
         d[xs, ys] = np.minimum(1.0, d[xs, ys] + regen_amount)
 
@@ -297,15 +304,19 @@ class ResourceField:
         d[xs + 1, y2s] += diffs
 
         # --- Nutrient clusters (from dead cells) ---
-        new_clusters = []  # <-- initialised OUTSIDE the regen/diff loops
-        for cx, cy, amount in self.nutrient_clusters:
+        if nutrient_fade is None:
+            nutrient_fade = CORPSE_NUTRIENT_FADE
+        new_clusters = []
+        for cluster in self.nutrient_clusters:
+            cx, cy, amount = cluster[0], cluster[1], cluster[2]
             if amount > 0.1:
                 if 0 <= cx < w and 0 <= cy < h:
                     d[cx, cy] = min(
                         1.0, d[cx, cy] + amount * CORPSE_NUTRIENT_FIELD_RATE
                     )
-                amount *= CORPSE_NUTRIENT_FADE  # fade out
-                new_clusters.append([cx, cy, amount])
+                amount *= nutrient_fade
+                # Preserve precomputed mask/falloff/max_r
+                new_clusters.append([cx, cy, amount] + list(cluster[3:]))
         self.nutrient_clusters = new_clusters
 
     def consume(self, x, y, amt):
@@ -326,7 +337,8 @@ class ResourceField:
                 break
 
         # Nutrient-cluster boost
-        for i, (cx, cy, cl_amount) in enumerate(self.nutrient_clusters):
+        for i, cluster in enumerate(self.nutrient_clusters):
+            cx, cy, cl_amount = cluster[0], cluster[1], cluster[2]
             if cl_amount > CORPSE_NUTRIENT_MIN_AMOUNT:
                 dist_sq = (cx - x) ** 2 + (cy - y) ** 2
                 if dist_sq <= CORPSE_NUTRIENT_BOOST_RADIUS ** 2:

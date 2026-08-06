@@ -142,7 +142,7 @@ FOOD_DECAY_RATE = 0.001    # fraction lost per tick (~50% in 693 ticks)
 
 # ── Food generation ─────────────────────────────────────────────────────────
 FOOD_REGEN_SPREAD = 200       # cells boosted per tick (was 200)
-FOOD_CLUSTER_RADIUS = 40      # max distance from a hotspot for clustered regen
+FOOD_CLUSTER_RADIUS = 18      # max distance from a hotspot for clustered regen
 FOOD_CLUSTER_CHANCE = 0.3     # probability of regen near a hotspot vs random
 FOOD_HOTSPOT_BOOST = 0.05     # extra energy added at hotspot center per regen
 
@@ -271,6 +271,7 @@ L10N = {
         "age": "Возраст",
         "lifespan": "Время жизни",
         "food_lifetime": "Время жизни еды",
+        "food_areola_lifetime": "Время жизни ареола",
         "fps": "FPS",
         "cells": "Клетки",
         "population": "Популяция",
@@ -357,6 +358,7 @@ L10N = {
         "age": "Age",
         "lifespan": "Lifespan",
         "food_lifetime": "Food Lifetime",
+        "food_areola_lifetime": "Food Areola Lifetime",
         "fps": "FPS",
         "cells": "Cells",
         "population": "Population",
