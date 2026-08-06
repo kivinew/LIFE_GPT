@@ -151,7 +151,7 @@ CORPSE_NUTRIENT_FIELD_RATE = (
     0.06  # cluster amount fed into the field per tick (was 0.03)
 )
 CORPSE_NUTRIENT_FADE = (
-    0.985  # per-tick fade of cluster amount (was 0.990 — shorter retention)
+    0.975  # per-tick fade of cluster amount — 30% shorter lifespan
 )
 CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
 CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)
@@ -189,7 +189,7 @@ CORPSE_NUTRIENT_FIELD_RATE = (
     0.06  # cluster amount fed into the field per tick (was 0.03)
 )
 CORPSE_NUTRIENT_FADE = (
-    0.985  # per-tick fade of cluster amount (was 0.990 — shorter retention)
+    0.975  # per-tick fade of cluster amount — 30% shorter lifespan
 )
 CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
 CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)

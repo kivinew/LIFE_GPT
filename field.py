@@ -246,18 +246,44 @@ class ResourceField:
         xs = np.random.randint(0, w, size=FOOD_REGEN_SPREAD)
         ys = np.random.randint(0, h, size=FOOD_REGEN_SPREAD)
         regen_amount = effective_regen * dt
-        # Nutrient-cluster hotspots: concentrated regen
+        # Nutrient-cluster hotspots: concentrated regen in irregular organic shape
         for cx, cy, cl_amount in self.nutrient_clusters:
             if cl_amount > CORPSE_NUTRIENT_MIN_AMOUNT and 0 <= cx < w and 0 <= cy < h:
-                # Radius around cluster: cells within FOOD_CLUSTER_RADIUS get boosted regen
-                rx = np.random.randint(
-                    max(0, cx - FOOD_CLUSTER_RADIUS), min(w, cx + FOOD_CLUSTER_RADIUS + 1),
-                    size=max(1, int(FOOD_REGEN_SPREAD * FOOD_CLUSTER_CHANCE)),
-                )
-                ry = np.random.randint(
-                    max(0, cy - FOOD_CLUSTER_RADIUS), min(h, cy + FOOD_CLUSTER_RADIUS + 1),
-                    size=max(1, int(FOOD_REGEN_SPREAD * FOOD_CLUSTER_CHANCE)),
-                )
+                n = max(1, int(FOOD_REGEN_SPREAD * FOOD_CLUSTER_CHANCE * 3))
+                # Build an irregular organic puddle mask (like a water stain)
+                seed = int((cx * 7 + cy * 13 + cl_amount * 1000)) % 10000
+                rng = np.random.RandomState(seed)
+                max_r = FOOD_CLUSTER_RADIUS
+                # Polygon-based puddle shape: extreme radius variation for stretched form
+                angles = np.linspace(0, 2 * np.pi, 8, endpoint=False)
+                # Extreme radii: some directions stretch far, others retract
+                boundary_radii = max_r * (0.25 + 0.75 * rng.rand(8))
+                # Add secondary sinusoidal perturbation for fine organic detail
+                sin_mod = 0.3 + 0.45 * np.sin(angles * 3 + seed * 0.01)
+                boundary_radii = boundary_radii * (1.0 + sin_mod)
+                # Build the polygon vertices
+                poly_x = (cx + boundary_radii * np.cos(angles)).astype(int)
+                poly_y = (cy + boundary_radii * np.sin(angles)).astype(int)
+                # Generate random points within bounding box
+                bx0, bx1 = max(0, cx - max_r), min(w, cx + max_r + 1)
+                by0, by1 = max(0, cy - max_r), min(h, cy + max_r + 1)
+                rx = rng.randint(bx0, bx1, size=n * 2)
+                ry = rng.randint(by0, by1, size=n * 2)
+                dx = rx - cx
+                dy = ry - cy
+                dist = np.sqrt(dx ** 2 + dy ** 2)
+                # Compute per-angle acceptance radius by interpolating the polygon boundary
+                ang_rad = np.arctan2(dy, dx)
+                ang_deg = np.degrees(ang_rad) % 360
+                # Map angle to the nearest polygon vertex pair for interpolation
+                seg = (ang_deg / 45).astype(int) % 8  # 360/8 = 45 degrees per segment
+                seg_next = (seg + 1) % 8
+                # Interpolation weight
+                frac = (ang_deg % 45) / 45.0
+                accept_r = (boundary_radii[seg] * (1 - frac) + boundary_radii[seg_next] * frac)
+                mask = dist <= np.clip(accept_r, 1, max_r * 2)
+                rx = rx[mask][:n]
+                ry = ry[mask][:n]
                 d[rx, ry] = np.minimum(1.0, d[rx, ry] + regen_amount * 1.5)
         # Random regen across the field
         d[xs, ys] = np.minimum(1.0, d[xs, ys] + regen_amount)
@@ -339,36 +365,13 @@ class ResourceField:
         for hx, hy, hv in self.hotspots:
             if 0 <= hx < w and 0 <= hy < h and d[hx, hy] > 0:
                 b = int(hv * 255)
-                buf[hx, hy] = (b // 2, b, 0)
+                self._fsurf.set_at((hx, hy), (b // 2, b, 0))
 
-        # Highlight nutrient clusters
+        # Highlight nutrient clusters — simple circle
         for cx, cy, amount in self.nutrient_clusters:
             if 0 <= cx < w and 0 <= cy < h and amount > CORPSE_NUTRIENT_MIN_AMOUNT:
                 it = int(min(255, amount * 30))
                 r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4))
-                # Core cluster circle
                 pygame.draw.circle(self._fsurf, (it, it // 2, 0), (cx, cy), max(1, r))
-
-                # Irregular organic halo around the cluster
-                halo_r = CORPSE_NUTRIENT_BOOST_RADIUS
-                seed = int((cx * 7 + cy * 13 + amount * 1000)) % 10000
-                halo_pts = []
-                for ai in range(48):
-                    ang = ai * math.tau / 48
-                    mod = (
-                        1.0
-                        + 0.35 * math.sin(seed * 0.013 + ai * 0.7)
-                        + 0.25 * math.cos(seed * 0.017 + ai * 0.5)
-                        + 0.20 * math.sin(seed * 0.023 + ai * 1.1)
-                    )
-                    rr = halo_r * mod
-                    px = int(cx + math.cos(ang) * rr)
-                    py = int(cy + math.sin(ang) * rr)
-                    halo_pts.append((px, py))
-                if len(halo_pts) >= 3:
-                    # Semi-transparent organic halo
-                    halo_surf = pygame.Surface((w, h), pygame.SRCALPHA)
-                    pygame.draw.polygon(halo_surf, (it, it // 2, 0, 40), halo_pts)
-                    self._fsurf.blit(halo_surf, (0, 0))
 
         surf.blit(self._fsurf, (0, 0))
