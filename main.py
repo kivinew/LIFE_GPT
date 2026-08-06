@@ -389,7 +389,7 @@ def main():
 
     # ── UI widgets ─────────────────────────────────────────────────────
     # Layout: left column (COL_LX) = genes/damage/env; right column (COL_RX) = sound
-    genes_box = VBox(COL_LX, 96, COL_W, spacing=28)
+    genes_box = VBox(COL_LX, 96, COL_W, spacing=8)
     sliders = [
         Slider(*genes_box.add(), tr("speed"), 0.5, 4.0, 1.5),
         Slider(*genes_box.add(), tr("sense"), 30, 120, 40),
@@ -415,7 +415,7 @@ def main():
     )
 
     # Damage block
-    dmg_box = VBox(COL_LX, genes_box.y + 14, COL_W, spacing=30)
+    dmg_box = VBox(COL_LX, genes_box.y + 14, COL_W, spacing=10)
     dmg_defaults = [0.6, 1.2, 1.0]
     sl_dmg = [
         Slider(
@@ -429,7 +429,7 @@ def main():
     ]
 
     # Environment block
-    env_box = VBox(COL_LX, dmg_box.y + 14, COL_W, spacing=28)
+    env_box = VBox(COL_LX, dmg_box.y + 14, COL_W, spacing=20)
     sl_regen = Slider(
         *env_box.add(),
         tr("food_regen"),
@@ -454,7 +454,7 @@ def main():
     sl_time = Slider(*env_box.add(), tr("time_scale"), 0.1, 5.0, 1.0)
 
     # Sound (right column)
-    sound_box = VBox(COL_RX, 726, COL_W, spacing=40)
+    sound_box = VBox(COL_RX, 726, COL_W, spacing=20)
     sl_sfx = Slider(*sound_box.add(), tr("sfx"), 0.0, 1.0, 0.1)
     sl_music = Slider(*sound_box.add(), tr("music"), 0.0, 1.0, 0.8)
 
