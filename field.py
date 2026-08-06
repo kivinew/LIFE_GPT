@@ -343,26 +343,31 @@ class ResourceField:
         # Highlight nutrient clusters — irregular organic puddle shape
         for cx, cy, amount in self.nutrient_clusters:
             if 0 <= cx < w and 0 <= cy < h and amount > CORPSE_NUTRIENT_MIN_AMOUNT:
+                # Irregular organic puddle: build a polygon with modulated radius
+                # per angle segment to create a non-square, non-circular smear
+                r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4) + 2)
+                if r < 2:
+                    r = 2
                 it = int(min(255, amount * 30))
-                r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4))
-                # Draw an irregular organic puddle instead of a perfect circle
-                ss = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
-                ccx, ccy = r + 2, r + 2
-                # Use the cluster position + amount as a deterministic seed
+                # Use cluster position + amount as a deterministic seed
                 seed = int((cx * 7 + cy * 13 + amount * 1000)) % 10000
-                for ri in range(r, 0, -1):
-                    t = ri / r
-                    alpha = int(255 * (1.0 - t * t) * 0.75)
-                    # Irregular radius: modulate with sin/cos at different frequencies
-                    # creates an organic, non-circular puddle shape
-                    irregular = (1.0 + 0.4 * (
-                        math.sin(seed * 0.013 + ri * 0.7) * 0.5
-                        + math.cos(seed * 0.017 + ri * 0.5) * 0.3
-                        + math.sin(seed * 0.023 + ri * 1.1) * 0.2
-                    ))
-                    rr = max(1, int(ri * irregular))
-                    pygame.draw.circle(ss, (it, it // 2, 0, alpha), (ccx, ccy), rr)
-                surf.blit(ss, (cx - ccx, cy - ccy))
+                # Build an irregular polygon by modulating radius per angle
+                points = []
+                for angle_i in range(36):
+                    angle = angle_i * math.tau / 36
+                    # Modulate radius with multiple sine waves for organic shape
+                    rad_mod = (
+                        1.0
+                        + 0.35 * math.sin(seed * 0.013 + angle_i * 0.7)
+                        + 0.25 * math.cos(seed * 0.017 + angle_i * 0.5)
+                        + 0.20 * math.sin(seed * 0.023 + angle_i * 1.1)
+                    )
+                    rr = r * rad_mod
+                    px = int(cx + math.cos(angle) * rr)
+                    py = int(cy + math.sin(angle) * rr)
+                    points.append((px, py))
+                if len(points) >= 3:
+                    pygame.draw.polygon(self._fsurf, (it, it // 2, 0), points)
 
         del buf
         surf.blit(self._fsurf, (0, 0))
