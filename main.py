@@ -552,9 +552,11 @@ def main():
     divisions = 0
     follow_mode = False
     show_stats = True
+    show_minimap = True
     show_memory = False
     show_energy_bars = True
     show_level_bars = True
+    show_spatial_grid = False
     time_lapse_mode = False
     time_lapse_active = False
     time_lapse_timer = 0

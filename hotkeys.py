@@ -58,6 +58,7 @@ class HotkeyState:
         "zoom",
         "show_memory",
         "show_minimap",
+        "show_spatial_grid",
     )
 
     def __init__(self, **kwargs):

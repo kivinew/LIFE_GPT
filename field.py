@@ -205,7 +205,7 @@ class ResourceField:
         x, y = int(x), int(y)
         if 0 <= x < self.w and 0 <= y < self.h and amount > 0.01:
             # Precompute an irregular organic puddle mask for this cluster
-            # so the shape stays consistent across ticks (not recalculated each frame)
+            # so the shape stays consistent across ticks
             seed = int((x * 7 + y * 13 + amount * 1000)) % 10000
             rng = np.random.RandomState(seed)
             max_r = FOOD_CLUSTER_RADIUS
@@ -215,24 +215,41 @@ class ResourceField:
             dym = my - max_r
             dist_m = np.sqrt(dxm ** 2 + dym ** 2)
             ang_m = np.arctan2(dym, dxm)
-            # Irregular radii per angle — organic water-stain shape
-            # Use 16 vertices with extreme radius variation (10% to 120% of max_r)
-            n_vertices = 16
-            vertex_angles = np.linspace(0, 2 * np.pi, n_vertices, endpoint=False)
-            # Extreme variation: some directions reach far, others retract sharply
-            vertex_radii = max_r * (0.1 + 1.1 * rng.rand(n_vertices))
-            # Apply per-vertex jitter for extra irregularity
-            vertex_jitter = 0.8 + 0.4 * rng.rand(n_vertices)
-            vertex_radii = vertex_radii * vertex_jitter
-            # Interpolate radius for each angle in the grid
-            ang_normalized = ((ang_m + np.pi) % (2 * np.pi))
-            seg = ((ang_normalized / (2 * np.pi)) * n_vertices).astype(int) % n_vertices
-            frac = ((ang_normalized / (2 * np.pi)) * n_vertices) - seg
-            accept_r = vertex_radii[seg] * (1 - frac) + vertex_radii[(seg + 1) % n_vertices] * frac
-            boundary_r = np.clip(accept_r, 1, max_r * 2)
-            # Store the precomputed mask and falloff
+            # Organic puddle boundary: radial sine modulation + smooth noise jitter
+            # Irrational frequencies break rotational symmetry; noise adds organic texture
+            # Generate smooth noise field via bilinear interpolation of coarse grid
+            coarse_size = max(4, max_r // 4)
+            coarse_noise = rng.rand(coarse_size, coarse_size)
+            yy, xx = np.mgrid[:mask_size, :mask_size]
+            cx = xx * (coarse_size - 1) / (mask_size - 1)
+            cy = yy * (coarse_size - 1) / (mask_size - 1)
+            ixc = np.clip(cx.astype(int), 0, coarse_size - 2)
+            iyc = np.clip(cy.astype(int), 0, coarse_size - 2)
+            fxc = cx - ixc
+            fyc = cy - iyc
+            noise = (
+                coarse_noise[iyc, ixc] * (1 - fxc) * (1 - fyc)
+                + coarse_noise[iyc, ixc + 1] * fxc * (1 - fyc)
+                + coarse_noise[iyc + 1, ixc] * (1 - fxc) * fyc
+                + coarse_noise[iyc + 1, ixc + 1] * fxc * fyc
+            )
+            # Multi-frequency sine modulation + noise jitter
+            rad_mod = (
+                1.0
+                + 0.30 * np.sin(seed * 0.017 + ang_m * 1.3)
+                + 0.25 * np.cos(seed * 0.023 + ang_m * 2.7)
+                + 0.20 * np.sin(seed * 0.031 + ang_m * 4.1)
+                + 0.15 * np.cos(seed * 0.037 + ang_m * 5.9)
+            )
+            # Modulate amplitude by noise for organic irregularity
+            rad_mod = rad_mod * (0.6 + 0.4 * noise)
+            max_diag = max_r * np.sqrt(2)
+            boundary_r = np.clip(rad_mod * max_r, max_r * 0.15, max_diag)
+            # Binary organic mask
             puddle_mask = (dist_m <= boundary_r).astype(np.float32)
-            falloff = np.clip(1.0 - dist_m / np.maximum(boundary_r, 1), 0, 1)
+            # Organic falloff: radial with noise modulation (breaks perfect radial symmetry)
+            base_falloff = np.clip(1.0 - dist_m / np.maximum(boundary_r, 1), 0, 1)
+            falloff = base_falloff * (0.5 + 0.5 * noise)
             self.nutrient_clusters.append([x, y, amount, puddle_mask, falloff, max_r])
 
     # ── Temperature effects on regeneration ──
@@ -284,14 +301,12 @@ class ResourceField:
                 falloff = cluster[4]
                 max_r = cluster[5]
                 weighted = puddle_mask * falloff
-                # Map mask coordinates back to world coordinates
-                wx = np.clip(np.arange(cx - max_r, cx + max_r + 1), 0, w - 1)
-                wy = np.clip(np.arange(cy - max_r, cy + max_r + 1), 0, h - 1)
-                # Apply weighted regen directly to field using vectorized indexing
-                dw = weighted * regen_amount * 1.5
-                # Use numpy ix_ for proper 2D indexing: d[rows=wy, cols=wx]
-                W, H = np.ix_(wy, wx)
-                d[W, H] = np.minimum(1.0, d[W, H] + dw)
+                dw = weighted * regen_amount * CORPSE_NUTRIENT_FIELD_RATE * 3.0
+                # Apply only to masked pixels using direct indexing (no bounding box bleed)
+                my_y, mx_x = np.where(puddle_mask)
+                gy = np.clip(cx - max_r + mx_x, 0, w - 1)
+                gx = np.clip(cy - max_r + my_y, 0, h - 1)
+                d[gy, gx] = np.minimum(1.0, d[gy, gx] + dw[my_y, mx_x])
         # Random regen across the field
         d[xs, ys] = np.minimum(1.0, d[xs, ys] + regen_amount)
 
@@ -311,9 +326,7 @@ class ResourceField:
             cx, cy, amount = cluster[0], cluster[1], cluster[2]
             if amount > 0.1:
                 if 0 <= cx < w and 0 <= cy < h:
-                    d[cx, cy] = min(
-                        1.0, d[cx, cy] + amount * CORPSE_NUTRIENT_FIELD_RATE
-                    )
+                    pass  # Center food regen handled via puddle_mask in step()
                 amount *= nutrient_fade
                 # Preserve precomputed mask/falloff/max_r
                 new_clusters.append([cx, cy, amount] + list(cluster[3:]))
@@ -379,11 +392,13 @@ class ResourceField:
                 b = int(hv * 255)
                 self._fsurf.set_at((hx, hy), (b // 2, b, 0))
 
-        # Highlight nutrient clusters — simple circle
-        for cx, cy, amount in self.nutrient_clusters:
-            if 0 <= cx < w and 0 <= cy < h and amount > CORPSE_NUTRIENT_MIN_AMOUNT:
-                it = int(min(255, amount * 30))
-                r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4))
-                pygame.draw.circle(self._fsurf, (it, it // 2, 0), (cx, cy), max(1, r))
+        # Highlight nutrient clusters — organic shape, no square halo
+        for cluster in self.nutrient_clusters:
+            if len(cluster) > 5:
+                cx, cy, amount, mask, falloff, cluster_max_r = cluster
+                if amount > CORPSE_NUTRIENT_MIN_AMOUNT and 0 <= cx < w and 0 <= cy < h:
+                    # The data already contains the organic-shaped cluster from step()
+                    # Just ensure the display reflects the actual data shape
+                    pass
 
         surf.blit(self._fsurf, (0, 0))
