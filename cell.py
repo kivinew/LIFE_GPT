@@ -949,11 +949,15 @@ class Cell:
             and self.level >= MAX_LEVEL
             and random.random() < 0.03
         )
-        available = self.energy if zoo_elite else self.energy * 0.90
-        parent_e = self.max_energy * 0.10
-        child_e = available - parent_e
+        # Energy split: parent keeps enough to survive; child gets the rest.
+        # Higher-level cells pass proportionally more energy to offspring.
+        parent_keep_ratio = 0.20 + (self.level / MAX_LEVEL) * 0.10  # 20%-30%
+        parent_e = self.max_energy * parent_keep_ratio
+        available = self.energy - parent_e
+        child_e = available if zoo_elite else available
 
-        if child_e < self.max_energy * 0.15:
+        # Child needs at least 15% of max to survive
+        if child_e < self.max_energy * 0.15 and not zoo_elite:
             return None
 
         child_genome = self.genome.clone_mutate(temperature)
@@ -977,9 +981,11 @@ class Cell:
 
         if zoo_elite:
             child.energy = self.max_energy * 0.30
+            self.energy = parent_e
         else:
-            child.energy = child_e
-            self.energy = self.energy - available + parent_e
+            # Clamp child energy so it never exceeds the child's own capacity
+            child.energy = min(child_e, child.max_energy)
+            self.energy = parent_e
 
         # Removed mass-based abort chance
         if self.energy <= LEVEL_DOWN_THRESHOLD and self.level > 0:
@@ -990,9 +996,23 @@ class Cell:
         return child
 
     def divide_phase(self, cells, grid, temperature=TEMP_MUT_DEFAULT):
-        """Attempt to divide if all conditions are met."""
+        """Attempt to divide if all conditions are met.
+
+        Uses genome.divide_chance as a per-tick probability gate.
+        High-level cells divide less frequently but pass more energy
+        to offspring, creating a natural selection pressure for
+        longer-lived, more investment-heavy lineages.
+        """
         if self.energy <= 0:
             return
+        if not self.can_divide():
+            return
+        # divide_chance: probability per tick when conditions are met.
+        # Scaled by level — higher-level cells divide less often.
+        level_penalty = 1.0 - (self.level / MAX_LEVEL) * 0.7  # 30% less chance at max level
+        if random.random() > self.genome.divide_chance * level_penalty:
+            return
+
         child = self.divide(temperature)
         if child is not None and cells is not None:
             cells.append(child)

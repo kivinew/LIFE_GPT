@@ -319,3 +319,24 @@ After Cython compilation, the sim kernel runs ~300 cells in <1ms. **Rendering is
 | Rendering optimization breaks visual correctness | Medium | Low | Keep original rendering as fallback; test with both paths |
 | Removing dead code breaks speciation feature | Medium | Low | The speciation code in `divide()` is already broken (references unset attributes) |
 | Removing biome system breaks future features | Low | Low | Biome system is currently dead code; can be re-added from git history |
+
+---
+
+## A.8 Planned Mechanics: Death & Decomposition
+
+### A.8.1 Temperature-Dependent Corpse Decomposition
+
+**Status**: TODO
+**Files**: `cell.py` (Corpse class), `field.py` (nutrient clusters), `config.py` (constants)
+
+**Description**:
+Decomposition rate of dead cells depends on ambient temperature:
+- **T > 0 °C**: decomposition proceeds normally; `CORPSE_NUTRIENT_FADE` scaled by temperature factor (same formula as food regen: linear from 0 at `FREEZE` to 1.0 at `TEMP_IDEAL`).
+- **T <= 0 °C**: decomposition halts completely — corpses are "frozen", their bodies preserved on the field. Nutrient clusters do not fade and do not feed the food field. Corpses remain visible until temperature rises above 0 °C, at which point decomposition resumes.
+- **Visual**: frozen corpses could be drawn with a blue/white tint to indicate their frozen state.
+
+**Implementation details**:
+1. In `field.py`, `step()` already computes `temp_factor` via `_get_temp_regen_factor()`. Reuse this factor for `nutrient_fade`: when `temp_factor == 0` (below freezing), set `nutrient_fade = 1.0` (no fade).
+2. Corpses (Cell instances with `alive=False`) currently remain in the `cells` list and are drawn by `draw_at()`. Add a `frozen` flag to corpses when temperature drops below `FREEZE` — frozen corpses skip decomposition logic.
+3. When temperature rises above `FREEZE`, unfreeze corpses and resume normal `CORPSE_NUTRIENT_FADE` decay.
+4. Optionally add a new `CORPSE_FREEZE_TINT` color constant in `config.py` for rendering frozen corpses.

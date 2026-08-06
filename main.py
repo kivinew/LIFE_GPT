@@ -109,7 +109,7 @@ from genome import Genome
 from spatial import build_spatial_grid, get_neighbors
 from memory import CellMemory
 from logger import init_logging, log_tick, close_logging
-from ui import Slider, SliderInt, PopulationGraph
+from ui import Slider, SliderInt, PopulationGraph, VBox
 from hotkeys import handle_key, HotkeyState
 
 # Cython backend (optional)
@@ -225,17 +225,11 @@ def _select_in_rect(cells, wx0, wy0, wx1, wy1, shift):
 
 
 # ── Population-graph legend / palette toggles ─────────────────────────────
-LEGEND_GROUP_Y = 799
-_LEGEND_GRID_Y = LEGEND_GROUP_Y + 26
-LEGEND_GRID_RECT = pygame.Rect(COL_LX, _LEGEND_GRID_Y, COL_W, 22)
-_LEGEND_GRID_RECT_PHOT = pygame.Rect(COL_LX, _LEGEND_GRID_Y, COL_W, 22)
-_LEGEND_GRID_RECT_ZOOP = pygame.Rect(COL_LX, _LEGEND_GRID_Y + 28, COL_W, 22)
-_LEGEND_GRID_RECT_POLY = pygame.Rect(COL_LX, _LEGEND_GRID_Y + 56, COL_W, 22)
 _LEGEND_DOT_R = 10
 _LEGEND_CLASS_R = 6
 
 
-def _palette_group_dots():
+def _palette_group_dots(legend_group_y):
     """Return [(kind, cx, cy, rect)] for the diet group dots + the Total dot."""
     xs = [COL_LX + 36, COL_LX + 118, COL_LX + 200, COL_LX + COL_W - 36]
     kinds = [PHOT, ZOOP, POLY, "total"]
@@ -245,10 +239,10 @@ def _palette_group_dots():
             (
                 kind,
                 cx,
-                LEGEND_GROUP_Y,
+                legend_group_y,
                 pygame.Rect(
                     cx - _LEGEND_DOT_R,
-                    LEGEND_GROUP_Y - _LEGEND_DOT_R,
+                    legend_group_y - _LEGEND_DOT_R,
                     _LEGEND_DOT_R * 2,
                     _LEGEND_DOT_R * 2,
                 ),
@@ -257,14 +251,12 @@ def _palette_group_dots():
     return out
 
 
-def _palette_class_grid(pop_graph, diet_filter=None, grid_rect=None, dot_r=_LEGEND_CLASS_R, gap=8):
+def _palette_class_grid(pop_graph, grid_rect, diet_filter=None, dot_r=_LEGEND_CLASS_R, gap=8):
     """Return (entries, offset, total) for the visible scroll window of classes.
 
     entries = list of (cls, rect, color, visible).
     If diet_filter is given, only classes of that diet are included.
     """
-    if grid_rect is None:
-        grid_rect = LEGEND_GRID_RECT
     cols = max(1, (grid_rect.w - 2 * gap) // (2 * dot_r + gap))
     rows = max(1, grid_rect.h // (2 * dot_r + gap))
     all_entries = pop_graph.legend_entries()
@@ -290,16 +282,16 @@ def _palette_class_grid(pop_graph, diet_filter=None, grid_rect=None, dot_r=_LEGE
     return out, offset, total
 
 
-def _palette_click(pop_graph, pos):
+def _palette_click(pop_graph, pos, legend_group_y, legend_grid_rects):
     """Handle a click on the legend/palette. Returns True if consumed."""
-    for kind, cx, cy, rect in _palette_group_dots():
+    for kind, cx, cy, rect in _palette_group_dots(legend_group_y):
         if rect.collidepoint(pos):
             if kind == "total":
                 pop_graph.toggle_total()
             else:
                 pop_graph.toggle_diet(kind)
             return True
-    for grid_rect in [_LEGEND_GRID_RECT_PHOT, _LEGEND_GRID_RECT_ZOOP, _LEGEND_GRID_RECT_POLY]:
+    for grid_rect in legend_grid_rects:
         for cls, rect, color, visible in _palette_class_grid(pop_graph, grid_rect=grid_rect)[0]:
             if rect.collidepoint(pos):
                 pop_graph.toggle_cls(cls)
@@ -396,23 +388,25 @@ def main():
     corpses = []
 
     # ── UI widgets ─────────────────────────────────────────────────────
+    # Layout: left column (COL_LX) = genes/damage/env; right column (COL_RX) = sound
+    genes_box = VBox(COL_LX, 96, COL_W, spacing=28)
     sliders = [
-        Slider(COL_LX, 96, COL_W, tr("speed"), 0.5, 4.0, 1.5),
-        Slider(COL_LX, 124, COL_W, tr("sense"), 30, 120, 40),
-        Slider(COL_LX, 152, COL_W, tr("mass"), 2, 8, 4),
-        Slider(COL_LX, 180, COL_W, tr("metabolism"), 0.01, 0.15, 0.04),
-        Slider(COL_LX, 208, COL_W, tr("divide_chance"), 0.1, 0.9, 0.5),
+        Slider(*genes_box.add(), tr("speed"), 0.5, 4.0, 1.5),
+        Slider(*genes_box.add(), tr("sense"), 30, 120, 40),
+        Slider(*genes_box.add(), tr("mass"), 2, 8, 4),
+        Slider(*genes_box.add(), tr("metabolism"), 0.01, 0.15, 0.04),
+        Slider(*genes_box.add(), tr("divide_chance"), 0.1, 0.9, 0.5),
     ]
     for s, k in zip(sliders, ["speed", "sense", "mass", "metabolism", "divide_chance"]):
         s.label_key = k
 
-    sl_interact = Slider(COL_LX, 248, COL_W, tr("interact"), INTERACT_MIN, 1.0, 0.5)
-    sl_diet_rect = pygame.Rect(COL_LX, 287, COL_W, 20)
+    genes_box.skip(12)
+    sl_interact = Slider(*genes_box.add(), tr("interact"), INTERACT_MIN, 1.0, 0.5)
+    sl_diet_rect = pygame.Rect(COL_LX, genes_box.y, COL_W, 20)
     sl_diet_val = 0
+    genes_box.skip(20)
     sl_zoophagy = Slider(
-        COL_LX,
-        327,
-        COL_W,
+        *genes_box.add(),
         tr("zoophagy"),
         ZOO_PHAGY_MIN,
         ZOO_PHAGY_MAX,
@@ -420,12 +414,12 @@ def main():
         labels=["0.5", "1.0", "2.0"],
     )
 
+    # Damage block
+    dmg_box = VBox(COL_LX, genes_box.y + 14, COL_W, spacing=30)
     dmg_defaults = [0.6, 1.2, 1.0]
     sl_dmg = [
         Slider(
-            COL_LX,
-            374 + i * 30,
-            COL_W,
+            *dmg_box.add(),
             [tr("dmg_phot"), tr("dmg_zoo"), tr("dmg_poly")][i],
             0.1,
             3.0,
@@ -434,10 +428,10 @@ def main():
         for i in range(3)
     ]
 
+    # Environment block
+    env_box = VBox(COL_LX, dmg_box.y + 14, COL_W, spacing=28)
     sl_regen = Slider(
-        COL_LX,
-        479,
-        COL_W,
+        *env_box.add(),
         tr("food_regen"),
         0.0,
         100.0,
@@ -446,9 +440,7 @@ def main():
         unit="%",
     )
     sl_temp = Slider(
-        COL_LX,
-        519,
-        COL_W,
+        *env_box.add(),
         tr("temp"),
         -10.0,
         35.0,
@@ -456,12 +448,15 @@ def main():
         labels=["-10°C", "13°C", "35°C"],
     )
     sl_temp._bias = 0.0
-    sl_food_lifetime = Slider(COL_LX, 559, COL_W, tr("food_lifetime"), 500, 6000, 3000)
-    sl_food_areola_lifetime = Slider(COL_LX, 597, COL_W, tr("food_areola_lifetime"), 100, 2000, 500)
-    sl_diffuse = Slider(COL_LX, 635, COL_W, tr("food_diffuse"), 0.005, 0.2, 0.06)
-    sl_time = Slider(COL_LX, 673, COL_W, tr("time_scale"), 0.1, 5.0, 1.0)
-    sl_sfx = Slider(COL_RX, 726, COL_W, tr("sfx"), 0.0, 1.0, 0.1)
-    sl_music = Slider(COL_RX, 766, COL_W, tr("music"), 0.0, 1.0, 0.8)
+    sl_food_lifetime = Slider(*env_box.add(), tr("food_lifetime"), 500, 6000, 3000)
+    sl_food_areola_lifetime = Slider(*env_box.add(), tr("food_areola_lifetime"), 100, 2000, 500)
+    sl_diffuse = Slider(*env_box.add(), tr("food_diffuse"), 0.005, 0.2, 0.06)
+    sl_time = Slider(*env_box.add(), tr("time_scale"), 0.1, 5.0, 1.0)
+
+    # Sound (right column)
+    sound_box = VBox(COL_RX, 726, COL_W, spacing=40)
+    sl_sfx = Slider(*sound_box.add(), tr("sfx"), 0.0, 1.0, 0.1)
+    sl_music = Slider(*sound_box.add(), tr("music"), 0.0, 1.0, 0.8)
 
     # Load background music: base64.txt -> existing bg_music.mp3 -> heartbeat.mp3 fallback
     music_loaded = False
@@ -598,6 +593,9 @@ def main():
         cam_x=cam_x,
         cam_y=cam_y,
         zoom=zoom,
+        show_memory=show_memory,
+        show_minimap=show_minimap,
+        show_spatial_grid=show_spatial_grid,
     )
 
     # ── Main loop ──────────────────────────────────────────────────────
@@ -618,6 +616,14 @@ def main():
             SEASON_TEMPERATURES[SEASON_ORDER[(season_idx + 1) % 4]] - season_temp
         ) * season_progress
 
+        # Pre-compute legend/palette positions for this frame (used in event handling and drawing)
+        _legend_group_y = env_box.y + 130
+        _legend_grid_y = _legend_group_y + 26
+        _legend_grid_rect = pygame.Rect(COL_LX, _legend_grid_y, COL_W, 22)
+        _legend_grid_rect_phot = pygame.Rect(COL_LX, _legend_grid_y, COL_W, 22)
+        _legend_grid_rect_zoop = pygame.Rect(COL_LX, _legend_grid_y + 28, COL_W, 22)
+        _legend_grid_rect_poly = pygame.Rect(COL_LX, _legend_grid_y + 56, COL_W, 22)
+
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
                 running = False
@@ -632,13 +638,13 @@ def main():
                 pmx, pmy = pygame.mouse.get_pos()
                 over_palette = any(
                     r.collidepoint(pmx, pmy)
-                    for r in [_LEGEND_GRID_RECT_PHOT, _LEGEND_GRID_RECT_ZOOP, _LEGEND_GRID_RECT_POLY]
+                    for r in [_legend_grid_rect_phot, _legend_grid_rect_zoop, _legend_grid_rect_poly]
                 ) or any(
-                    r.collidepoint(pmx, pmy) for *_, r in _palette_group_dots()
+                    r.collidepoint(pmx, pmy) for *_, r in _palette_group_dots(_legend_group_y)
                 )
                 if over_palette:
                     total = len(pop_graph.legend_entries())
-                    _, _, per_page = _palette_class_grid(pop_graph)
+                    _, _, per_page = _palette_class_grid(pop_graph, _legend_grid_rect_phot)
                     if total > per_page:
                         step = 5
                         pop_graph.legend_offset = max(
@@ -746,7 +752,7 @@ def main():
                 shift = bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
                 alt = bool(pygame.key.get_mods() & pygame.KMOD_ALT)
                 # Legend/palette clicks take priority over world clicks
-                if _palette_click(pop_graph, e.pos):
+                if _palette_click(pop_graph, e.pos, _legend_group_y, [_legend_grid_rect_phot, _legend_grid_rect_zoop, _legend_grid_rect_poly]):
                     st.sel_cell = sel_cell
                     continue
                 in_world = wx < W - SB and not map_rect.collidepoint(e.pos)
@@ -1106,9 +1112,9 @@ def main():
             t = font.render(title, True, CYAN)
             screen.blit(t, (COL_LX + COL_W // 2 - t.get_width() // 2, y + 5))
 
-        draw_block(68, 286, tr("genes"))
-        draw_block(356, 98, tr("damage"))
-        draw_block(456, 253, tr("environment"))
+        draw_block(68, genes_box.y - 56, tr("genes"))
+        draw_block(genes_box.y + 8, dmg_box.y - genes_box.y - 8 + 14, tr("damage"))
+        draw_block(dmg_box.y + 8, env_box.y - dmg_box.y - 8 + 14, tr("environment"))
 
         # ── UI: Sliders & labels ─────────────────────────────────────────
         for s in sliders:
@@ -1327,28 +1333,37 @@ def main():
                 screen.blit(surf, (10, 10 + i * 22))
 
         # ── UI: Population graph ────────────────────────────────────────
-        pygame.draw.rect(screen, GRAY, (COL_LX - 5, 689, COL_W + 10, 108), 1, 4)
+        graph_y = env_box.y + 20
+        pygame.draw.rect(screen, GRAY, (COL_LX - 5, graph_y, COL_W + 10, 108), 1, 4)
         gt = font.render(tr("population_graph"), True, CYAN)
-        screen.blit(gt, (COL_LX + COL_W // 2 - gt.get_width() // 2, 694))
+        screen.blit(gt, (COL_LX + COL_W // 2 - gt.get_width() // 2, graph_y + 5))
         pop_graph.update(tick, cells)
-        pop_graph.draw(screen, COL_LX, 715, COL_W, 76)
+        pop_graph.draw(screen, COL_LX, graph_y + 26, COL_W, 76)
 
         # ── UI: Legend / palette (drawn AFTER graph so it's on top) ─────
+        legend_group_y = graph_y + 110
+        legend_grid_y = legend_group_y + 26
+        legend_grid_rect = pygame.Rect(COL_LX, legend_grid_y, COL_W, 22)
+        legend_grid_rect_phot = pygame.Rect(COL_LX, legend_grid_y, COL_W, 22)
+        legend_grid_rect_zoop = pygame.Rect(COL_LX, legend_grid_y + 28, COL_W, 22)
+        legend_grid_rect_poly = pygame.Rect(COL_LX, legend_grid_y + 56, COL_W, 22)
+        legend_dot_r = 10
+        legend_class_r = 6
         group_labels = {
             PHOT: tr("diet_phot"),
             ZOOP: tr("diet_zoop"),
             POLY: tr("diet_poly"),
         }
-        for kind, cx, cy, rect in _palette_group_dots():
+        for kind, cx, cy, rect in _palette_group_dots(legend_group_y):
             if kind == "total":
                 color = YEL
                 label = tr("total")
                 active = pop_graph.show_total
                 if active:
-                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
+                    pygame.draw.circle(screen, color, (cx, cy), legend_dot_r)
                 else:
-                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R, 1)
-                    r = _LEGEND_DOT_R - 3
+                    pygame.draw.circle(screen, color, (cx, cy), legend_dot_r, 1)
+                    r = legend_dot_r - 3
                     pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 2)
                     pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 2)
             else:
@@ -1360,29 +1375,29 @@ def main():
                     if d == kind
                 )
                 if diet_hidden:
-                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R, 1)
-                    r = _LEGEND_DOT_R - 3
+                    pygame.draw.circle(screen, color, (cx, cy), legend_dot_r, 1)
+                    r = legend_dot_r - 3
                     pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 2)
                     pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 2)
                 else:
-                    pygame.draw.circle(screen, color, (cx, cy), _LEGEND_DOT_R)
+                    pygame.draw.circle(screen, color, (cx, cy), legend_dot_r)
             surf = tiny.render(label, True, WHITE)
             screen.blit(surf, (cx - surf.get_width() // 2, cy + 14))
         # Scrollable per-class palette — three groups by diet
         for diet_id, grid_rect, label_key in [
-            (PHOT, _LEGEND_GRID_RECT_PHOT, "diet_phot"),
-            (ZOOP, _LEGEND_GRID_RECT_ZOOP, "diet_zoop"),
-            (POLY, _LEGEND_GRID_RECT_POLY, "diet_poly"),
+            (PHOT, legend_grid_rect_phot, "diet_phot"),
+            (ZOOP, legend_grid_rect_zoop, "diet_zoop"),
+            (POLY, legend_grid_rect_poly, "diet_poly"),
         ]:
             diet_label = tiny.render(tr(label_key), True, diet_color(diet_id, 10))
             screen.blit(diet_label, (grid_rect.x, grid_rect.y - 12))
             pal_entries, offset, total = _palette_class_grid(pop_graph, diet_filter=diet_id, grid_rect=grid_rect)
             for cls, rect, color, visible in pal_entries:
                 if visible:
-                    pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R)
+                    pygame.draw.circle(screen, color, rect.center, legend_class_r)
                 else:
-                    pygame.draw.circle(screen, color, rect.center, _LEGEND_CLASS_R, 1)
-                    r = _LEGEND_CLASS_R - 2
+                    pygame.draw.circle(screen, color, rect.center, legend_class_r, 1)
+                    r = legend_class_r - 2
                     cx, cy = rect.center
                     pygame.draw.line(screen, RED, (cx - r, cy - r), (cx + r, cy + r), 1)
                     pygame.draw.line(screen, RED, (cx - r, cy + r), (cx + r, cy - r), 1)

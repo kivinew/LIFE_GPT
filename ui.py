@@ -24,6 +24,22 @@ _SEASON_COLOR = {
 }
 
 
+class VBox:
+    def __init__(self, x, y, width, spacing=28):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.spacing = spacing
+
+    def add(self, height=20):
+        rect = (self.x, self.y, self.width)
+        self.y += height + self.spacing
+        return rect
+
+    def skip(self, pixels):
+        self.y += pixels
+
+
 class Slider:
     def __init__(self, x, y, w, lab, mn, mx, val, labels=None, unit=None):
         self.rect = pygame.Rect(x, y, w, 20)

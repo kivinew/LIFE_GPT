@@ -310,6 +310,9 @@ def handle_key(e, st):
         st.show_stats = not st.show_stats
     elif k == pygame.K_m and (getattr(e, "mod", 0) & pygame.KMOD_CTRL):
         st.show_memory = not st.show_memory
+    elif k == pygame.K_g:
+        st.show_energy_bars = not st.show_energy_bars
+        print(f"Energy bars: {'ON' if st.show_energy_bars else 'OFF'}")
 
     elif k == pygame.K_z:
         if st.sel_cell is not None:
@@ -328,9 +331,6 @@ def handle_key(e, st):
         if st.sel_cell is not None:
             st.cam_x, st.cam_y = st.sel_cell.x, st.sel_cell.y
 
-    elif k == pygame.K_g:
-        st.show_energy_bars = not st.show_energy_bars
-        print(f"Energy bars: {'ON' if st.show_energy_bars else 'OFF'}")
     elif k == pygame.K_v:
         st.show_level_bars = not st.show_level_bars
         print(f"Level bars: {'ON' if st.show_level_bars else 'OFF'}")
