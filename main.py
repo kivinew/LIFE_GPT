@@ -1235,6 +1235,18 @@ def main():
                         col = diet_color(POLY, c.cls)
                     map_surf.set_at((px, py), col)
 
+        # Highlight selected cell on minimap
+        if sel_cell and 0 <= sel_cell.x < world_w and 0 <= sel_cell.y < world_h:
+            px = int(sel_cell.x * map_scale_x)
+            py = int(sel_cell.y * map_scale_y)
+            # Draw red crosshair for selected cell
+            map_surf.set_at((px, py), (255, 0, 0))
+            # Draw small cross to make it more visible
+            for dx in [-2, -1, 0, 1, 2]:
+                for dy in [-2, -1, 0, 1, 2]:
+                    if dx != 0 or dy != 0:
+                        map_surf.set_at((px + dx, py + dy), (255, 0, 0))
+
         # Dead cells (corpses) - also use spatial grid optimization
         if len(corpses) > 20:
             grid = build_spatial_grid(corpses)
@@ -1264,12 +1276,13 @@ def main():
             max(2, int(H / zoom * map_scale_y)),
         )
         pygame.draw.rect(map_surf, WHITE, cam_rect, 1)
-        pygame.draw.rect(
-            screen, GRAY, (COL_RX - 5, 430, COL_W + 10, map_size + 31), 1, 4
-        )
-        mt = small.render(tr("minimap"), True, CYAN)
-        screen.blit(mt, (COL_RX + COL_W // 2 - mt.get_width() // 2, 435))
-        screen.blit(map_surf, (map_rect.x, map_rect.y))
+        if show_minimap:
+            pygame.draw.rect(
+                screen, GRAY, (COL_RX - 5, 430, COL_W + 10, map_size + 31), 1, 4
+            )
+            mt = small.render(tr("minimap"), True, CYAN)
+            screen.blit(mt, (COL_RX + COL_W // 2 - mt.get_width() // 2, 435))
+            screen.blit(map_surf, (map_rect.x, map_rect.y))
 
         # ── UI: Stats (top-left) ─────────────────────────────────────────
         if show_stats:
@@ -1292,7 +1305,7 @@ def main():
                 if hasattr(sel_cell, 'memory'):
                     mem_stats = []
                     # Add general memory info
-                    mem_stats.append(f"Memory classes: {len(sel_cell.memory)}")
+                    mem_stats.append(f"{tr('memory')}: {len(sel_cell.memory)} classes learned")
                     # Add detailed threat/coop info for each class learned
                     if hasattr(sel_cell.memory, 'summary'):
                         summary = sel_cell.memory.summary()

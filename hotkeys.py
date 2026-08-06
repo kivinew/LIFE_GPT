@@ -57,6 +57,7 @@ class HotkeyState:
         "cam_y",
         "zoom",
         "show_memory",
+        "show_minimap",
     )
 
     def __init__(self, **kwargs):
@@ -332,6 +333,10 @@ def handle_key(e, st):
     elif k == pygame.K_v:
         st.show_level_bars = not st.show_level_bars
         print(f"Level bars: {'ON' if st.show_level_bars else 'OFF'}")
+
+    elif k == pygame.K_h:
+        st.show_minimap = not st.show_minimap
+        print(f"Minimap: {'ON' if st.show_minimap else 'OFF'}")
 
     elif k == pygame.K_ESCAPE:
         if _selected(st.cells):
