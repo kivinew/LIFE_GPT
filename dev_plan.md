@@ -194,10 +194,15 @@ LIFE_GPT is a 2D cellular evolution simulator where cells with heritable genomes
 ### A.3.2 Performance: Rendering Bottleneck
 After Cython compilation, the sim kernel runs ~300 cells in <1ms. **Rendering is the real bottleneck** (~10 FPS).
 
-- `smoothscale` is called every frame (expensive)
-- Draws individual circles for each cell (no batch rendering)
-- Creates a new `pygame.Surface` for the minimap every frame it's shown
+- `smoothscale` is called every frame (expensive) — cached when zoom unchanged
+- **Per-cell surface allocation** (`draw_at()` creates a new `SRCALPHA` Surface + concentric gradient circles per cell per frame) — the single largest rendering cost at 300+ cells
+- Draws individual circles for each cell (no batch rendering) — cell surface caching eliminates this
+- Creates a new `pygame.Surface` for the minimap every frame it's shown — not cached between frames; batch `blit` of cached dot surfaces instead of per-pixel `set_at()`
 - No FPS counter displayed to the user
+- **`math.hypot` called thousands of times per tick** — replace with squared-distance comparisons where possible (eliminates sqrt)
+- **Spatial grid rebuilt every tick** even when cells haven't moved — dirty flag avoids redundant rebuilds
+- **Nutrient cluster surfaces recreated every frame** with sin/cos modulation — pre-render and cache
+- **Population graph redrawn every frame** even when data unchanged — cache the rendered surface, only re-render on new data
 
 ### A.3.3 Code Quality Issues
 - **`cell.py` is 925 lines** — the `step()` method has 15 phases, each a separate method, but many contain duplicated spatial grid iteration patterns
@@ -230,157 +235,71 @@ After Cython compilation, the sim kernel runs ~300 cells in <1ms. **Rendering is
 - **No CI/CD** configuration
 - **`__pycache__`** is already in `.gitignore` ✅
 
-## A.4 Optimization Plan
+### A.4 Optimization Plan (from update.md)
 
-### Phase 1: Critical Fixes (Priority: P0)
+#### P0 — Critical Rendering Fixes
 
-| # | Task | File(s) | Effort | Description |
-|---|------|---------|--------|-------------|
-| 1.1 | Sync sim_core.pyx constants with config.py | `sim_core.pyx` | 30 min | Update `_FEED_EFFICIENCY_BASE` from 18.0 to 22.0. Add a comment linking each constant to its config.py source. |
-| 1.2 | Remove dead speciation code from `cell.py` | `cell.py` | 15 min | Remove the speciation block in `divide()` that references `self.field`, `self._world`, and `field.trigger_species_competition` which are never set. |
-| 1.3 | Remove unused `_interact_with` alias | `cell.py` | 5 min | Delete line 759 `_interact_with = interact_with`. |
-| 1.4 | Remove dead `adjust_biomes_for_season` or integrate it | `field.py` + `main.py` | 30 min | Either remove the unused method or hook it into the season change logic in `main.py` (around line 435). |
-| 1.5 | Remove unused import constants | `main.py` | 5 min | `PHOT_MIN_REQUIRED`, `ZOOP_MIN_REQUIRED`, `POLY_MIN_REQUIRED` are imported but never used. Either use them or remove the imports. |
-| 1.6 | Add FPS counter to stats display | `main.py` | 10 min | Display `clock.get_fps()` in the stats panel (top-left). |
-| 1.7 | Generate requirements.txt | root | 10 min | Create from pyproject.toml: `pygame>=2.5.0`, `numpy`, `cython` (optional). |
+| # | Task | File | Effort | Expected Gain |
+|---|------|------|--------|---------------|
+| 1 | Cache cell surfaces per `(cls, radius)` pair; invalidate on `refresh_class()` | `cell.py` | Medium | +30–70% FPS |
+| 2 | Replace `math.hypot` with squared-distance comparisons in all cell phases | `cell.py` | Low | +5–10% FPS |
+| 3 | Batch minimap rendering — `blit` cached 1×1 dot surfaces instead of per-pixel `set_at()` | `main.py` | Low | +5% FPS |
+| 4 | Cache population graph surface; only re-render on new data | `ui.py` | Low | +2–3% FPS |
+| 5 | Return `tuple` from `get_neighbors()` to avoid list mutation overhead | `spatial.py` | Low | +2% FPS |
 
-### Phase 2: Performance Optimization (Priority: P1)
+#### P1 — Structural Optimizations
 
-#### 2.1 Batch Cell Rendering (2-3h)
-- **Subtask 2.1a**: Group cells by `(cls, color)` and render each group to a single `pygame.Surface` using `pygame.draw.circle`, then blit once per group.
-- **Subtask 2.1b**: Cache per-class surfaces and only recreate when cell count/color changes.
-- **Subtask 2.1c**: Replace per-cell `draw_at` calls with batch blit.
+| # | Task | File | Effort | Expected Gain |
+|---|------|------|--------|---------------|
+| 6 | Spatial grid dirty flag — skip rebuild when no cell moved > `CELL_SIZE/2` | `spatial.py` | Medium | +5–15% FPS |
+| 7 | Pre-render nutrient cluster surfaces; cache and only recreate when amount changes >10% | `field.py` | Medium | +3–8% FPS |
+| 8 | Replace biome `(x,y)` dict with 2D numpy uint8 array of biome indices | `field.py` | Medium | +3–5% FPS |
+| 9 | Grid-based cell picking — use spatial grid to check only nearby cells | `main.py` | Medium | O(1) pick |
 
-#### 2.2 Cache smoothscale when zoom unchanged (1h)
-`smoothscale` is called every frame even when zoom hasn't changed. Cache the scaled surface and only re-scale when `prev_zoom != zoom`.
+#### P2 — Cython Extension
 
-#### 2.3 Optimize minimap rendering (30min)
-Cache the minimap `map_surf` and only redraw when cells have changed (dirty flag). Currently it creates a new surface and redraws all cells every frame.
+| # | Task | File | Effort | Expected Gain |
+|---|------|------|--------|---------------|
+| 10 | Extend `sim_core.pyx` to cover `sensory_phase`, `combat_phase`, `social_phase` | `sim_core.pyx` | High | 2–5× on covered phases |
 
-#### 2.4 Vectorize population graph updates (1h)
-`PopulationGraph.update()` iterates all cells every frame. Use a dict counter updated incrementally (increment on spawn, decrement on death) instead of recounting from scratch.
+#### P3 — Nice-to-Have
 
-#### 2.5 Add Cython path for `sensory_phase` and `combat_phase` (4-6h)
-These are the hottest loops in the Python fallback path. Moving them to Cython would give ~10x speedup for the non-Cython build.
-- **Subtask 2.5a**: Extract `sensory_phase` ray sampling into `sim_core.pyx`.
-- **Subtask 2.5b**: Extract `combat_phase` damage calculations into `sim_core.pyx`.
+| # | Task | File | Effort | Expected Gain |
+|---|------|------|--------|---------------|
+| 11 | Fixed-step simulation loop — decouple logic from rendering | `main.py` | Medium | Stable FPS under load |
+| 12 | Reduce corpse/nutrient cluster lifetimes for faster FPS recovery | `config.py` | Low | Faster recovery after die-offs |
+| 13 | Vectorize neighbor calculations with NumPy (Python fallback path only) | `cell.py` | High | Order-of-magnitude for sensing |
 
-#### 2.6 Reduce ray sampling in sensory_phase (30min)
-Current: 16 random rays per PHOT/POLY cell per tick. Reduce to 8 or use deterministic angular sampling (e.g., 8 evenly spaced rays).
+#### Implementation Priority Order
+1. Squared distance comparisons (free win)
+2. Cell surface caching (biggest single FPS gain)
+3. Batch minimap blits (trivial)
+4. Graph surface caching (trivial)
+5. Return tuples from `get_neighbors` (trivial)
+6. Spatial grid dirty flag (moderate, good payoff)
+7. Cluster surface caching (moderate)
+8. Biome array (moderate)
+9. Grid-based cell picking (moderate)
+10. Extend Cython coverage (highest effort, highest ceiling)
 
-#### 2.7 Optimize spatial grid neighbor lookups (1h)
-`get_neighbors()` creates a new list every call. Pre-allocate or use a pool. Cache neighbor lists per cell per tick.
+#### Testing Methodology
+1. Launch with 400+ initial cells (spawn templates or cheat)
+2. Observe FPS in bottom-right corner (Tab stats)
+3. Clear world (`C`) and measure FPS recovery time
+4. After each optimization, compare FPS at same cell count
+5. Verify visual correctness: cell colors, behaviors, graph shape
+6. Verify no regression in simulation logic (energy conservation, division, combat)
 
-#### 2.8 Remove unused biome system from simulation (1h)
-`_assign_biomes()` iterates W*H grid cells on init and stores in a dict. `adjust_biomes_for_season` is defined but never called. Either remove the biome system entirely or make it lazy/on-demand and actually hook it into the season cycle.
-
-### Phase 3: Code Quality & Architecture (Priority: P2)
-
-#### 3.1 Extract main loop into smaller functions (2-3h)
-Split `main()` into: `handle_events()`, `update_simulation()`, `render_world()`, `render_ui()`, `update_sliders()`. Each ~50-80 lines.
-- **Subtask 3.1a**: Extract `handle_events()` — all keyboard/mouse event handling.
-- **Subtask 3.1b**: Extract `update_simulation()` — season logic, temperature, simulation step.
-- **Subtask 3.1c**: Extract `render_world()` — world surface, cell drawing, minimap.
-- **Subtask 3.1d**: Extract `render_ui()` — sidebar, stats, population graph.
-
-#### 3.2 Add type hints to all public functions (3-4h)
-Add `def func(arg: type) -> return_type:` annotations throughout. Use `from __future__ import annotations` for Python 3.14 compatibility.
-
-#### 3.3 Decouple Cell from config constants (2h)
-Cell imports 30+ specific constants from config. Group them into a `CellConfig` dataclass or namespace.
-
-#### 3.4 Remove unused genome.py methods (30min)
-`apply_epigenetic_modulation()` and `reset_epigenetics()` are never called. Either remove them or integrate them into the mutation system.
-
-#### 3.5 Add proper error handling for sound loading (30min)
-Wrap sound loading in try/except with specific exception types. Provide graceful degradation if MP3 files are missing.
-
-#### 3.6 Add ruff + black config to pyproject.toml (10min)
-Add `[tool.ruff]` and `[tool.black]` sections to pyproject.toml. Run once to format all files.
-
-### Phase 4: New Features (Priority: P3)
-
-#### 4.1 Extinction prevention (2h)
-If any diet type drops below `PHOT_MIN_REQUIRED`/`ZOOP_MIN_REQUIRED`/`POLY_MIN_REQUIRED`, auto-spawn cells of that type at random positions. Constants are already defined but unused.
-
-#### 4.2 Speciation visualization (3-4h)
-When a new species emerges (genetic distance > threshold), give it a distinct color and show a brief "speciation" animation.
-
-#### 4.3 Genome editor UI (6-8h)
-Allow the user to click a cell and edit its genome traits via the sidebar sliders before placing it. Add a "clone & edit" mode.
-
-#### 4.4 Time-lapse video export (4-6h)
-Capture frames at configurable intervals, encode to MP4 using ffmpeg or imageio. Add a "Record" toggle in the UI.
-
-#### 4.5 CSV population export (2h)
-Add a keybinding (e.g., `Ctrl+E`) to export the current population data (counts per diet, avg energy, avg mass, avg level) to a timestamped CSV file.
-
-#### 4.6 Cell memory debug overlay (2h)
-Toggle with a key (e.g., `Tab`) to show threat/coop scores for each cell's memory.
-
-#### 4.7 Spatial grid visualization (2h)
-Toggle with a key to draw the spatial hash grid overlay (cell boundaries, neighbor connections).
-
-#### 4.8 Sound volume per-type (1h)
-Allow independent volume control for SFX vs music, and per-event volume.
-
-#### 4.9 Biome-based resource variation (3h)
-Actually use the biome system during simulation: biomes affect local resource regeneration rate, temperature, and food type availability.
-
-#### 4.10 Undo/redo for cell placement (2h)
-Maintain a stack of cell placement/removal actions. Ctrl+Z to undo, Ctrl+Y to redo.
-
-### Phase 5: Testing & DevOps (Priority: P4)
-
-#### 5.1 Add requirements.txt (10min)
-Generate from pyproject.toml: `pygame>=2.5.0`, `numpy`, `cython` (optional).
-
-#### 5.2 Add basic test suite (4-6h)
-Test Genome mutation bounds, Cell energy calculations, config constant consistency between config.py and sim_core.pyx, spatial grid correctness. Use `pytest`.
-- **Subtask 5.2a**: Test Genome mutation stays within bounds.
-- **Subtask 5.2b**: Test Cell energy calculations (feeding, metabolism, combat).
-- **Subtask 5.2c**: Test config constant consistency between config.py and sim_core.pyx.
-- **Subtask 5.2d**: Test spatial grid correctness (neighbor lookups, cell insertion).
-
-#### 5.3 CI/CD pipeline (2-3h)
-GitHub Actions: run tests on push, build Cython extension, lint with ruff/black.
-
-#### 5.4 Balance regression test (2h)
-Run 10k ticks with fixed seed, assert population counts per diet stay within expected ranges.
-
-## A.5 Constants Sync Checklist
-
-When changing balance values in `config.py`, always update `sim_core.pyx` lines 14–37:
-
-| config.py constant | sim_core.pyx line | Notes |
-|--------------------|-------------------|-------|
-| `ENERGY_MASS_COEFF` | `_ENERGY_MASS_COEFF` | Line 19 |
-| `COMBAT_BASE_DAMAGE` | `_COMBAT_BASE_DAMAGE` | Line 34 |
-| `COMBAT_DAMAGE_GAIN` | `_COMBAT_DAMAGE_GAIN` | Line 35 |
-| `FEED_EFFICIENCY_BASE` | `_FEED_EFFICIENCY_BASE` | Line 30 |
-| `PHOT_FEED_EFFICIENCY` | `_PHOT_FEED_EFFICIENCY` | Line 31 |
-| `POLY_FEED_EFFICIENCY` | `_POLY_FEED_EFFICIENCY` | Line 32 |
-| `MIN_MASS_EFFICIENCY` | `_MIN_MASS_EFFICIENCY` | Line 33 |
-| `MASS_DMG_EFFICIENCY` | `_MASS_DMG_EFFICIENCY` | Line 36 |
-| `MIN_MASS_DMG_EFF` | `_MIN_MASS_DMG_EFF` | Line 37 |
-| `PREDATOR_METABOLISM_MULT` | `_PREDATOR_METABOLISM_MULT` | Line 27 |
-| `SPEED_COST` | `_SPEED_COST` | Line 28 |
-| `MASS_PENALTY` | `_MASS_PENALTY` | Line 29 |
-| `LEVEL_UP_THRESHOLD` | `_LEVEL_UP_THRESHOLD` | Line 20 |
-| `LEVEL_MASS_BASE` | `_LEVEL_MASS_BASE` | Line 23 |
-| `LEVEL_MASS_STEP` | `_LEVEL_MASS_STEP` | Line 24 |
-
-## A.6 Rendering Performance Targets
+#### Rendering Performance Targets (updated)
 
 | Metric | Current | Target | Method |
 |--------|---------|--------|--------|
-| FPS (300 cells, Cython) | ~10 | 30+ | Batch rendering, cached surfaces |
+| FPS (300 cells, Cython) | ~10 | 30+ | Cell surface caching, batch minimap blits |
 | FPS (300 cells, Python) | ~3 | 10+ | Move sensory_phase + combat_phase to Cython |
 | Tick time (300 cells) | <1ms | <0.5ms | Already met with Cython |
 | Memory usage (1000 cells) | ~50MB | ~30MB | Reduce per-cell allocations, reuse surfaces |
 
-## A.7 Immediate Action Items (Next Session)
-
+#### Immediate Action Items (Next Session)
 1. **Fix sim_core.pyx constants drift** — update `_FEED_EFFICIENCY_BASE` from 18.0 to 22.0 (P0)
 2. **Remove dead speciation code** from `cell.py` divide method (P0)
 3. **Remove unused `_interact_with` alias** from `cell.py` (P0)
@@ -388,8 +307,10 @@ When changing balance values in `config.py`, always update `sim_core.pyx` lines 
 5. **Remove unused import constants** from `main.py` (P0)
 6. **Add FPS counter** to the stats display in `main.py` (P0)
 7. **Generate requirements.txt** from pyproject.toml (P0)
+8. **Implement cell surface caching** — biggest single FPS win (P1)
+9. **Squared-distance comparisons** — free win across all cell phases (P1)
 
-## A.8 Risk Assessment
+## A.7 Risk Assessment
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|-----------|------------|

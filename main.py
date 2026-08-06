@@ -532,7 +532,7 @@ def main():
     world_surf = pygame.Surface((world_w, world_h))
     scaled_surf = None
 
-    map_size = 225
+    map_size = 200
     map_rect = pygame.Rect(COL_RX, 452, map_size, map_size)
     map_scale_x = map_size / world_w
     map_scale_y = map_size / world_h
@@ -1184,24 +1184,62 @@ def main():
             pygame.transform.smoothscale(field._fsurf, (map_size, map_size), map_surf)
         else:
             map_surf.fill((30, 30, 30))
-        for c in cells:
-            if 0 <= c.x < world_w and 0 <= c.y < world_h:
-                px = int(c.x * map_scale_x)
-                py = int(c.y * map_scale_y)
-                if c.genome.diet == PHOT:
-                    col = diet_color(PHOT, c.cls)
-                elif c.genome.diet == ZOOP:
-                    col = diet_color(ZOOP, c.cls)
-                else:
-                    col = diet_color(POLY, c.cls)
-                map_surf.set_at((px, py), col)
-        # Dead cells (corpses)
-        for cp in corpses:
-            if 0 <= cp.x < world_w and 0 <= cp.y < world_h:
-                map_surf.set_at(
-                    (int(cp.x * map_scale_x), int(cp.y * map_scale_y)),
-                    (150, 90, 90),
-                )
+
+        # Use spatial grid for efficient cell selection (minimap optimization)
+        grid = None
+        if len(cells) > 20:
+            grid = build_spatial_grid(cells)
+            # Get all cells that could potentially be in the map view
+            for cx in range(int(cam_x / CELL_SIZE) - 3, int(cam_x / CELL_SIZE) + 3):
+                for cy in range(int(cam_y / CELL_SIZE) - 3, int(cam_y / CELL_SIZE) + 3):
+                    if (cx, cy) in grid:
+                        for idx in grid[(cx, cy)]:
+                            c = cells[idx]
+                            if 0 <= c.x < world_w and 0 <= c.y < world_h:
+                                px = int(c.x * map_scale_x)
+                                py = int(c.y * map_scale_y)
+                                if c.genome.diet == PHOT:
+                                    col = diet_color(PHOT, c.cls)
+                                elif c.genome.diet == ZOOP:
+                                    col = diet_color(ZOOP, c.cls)
+                                else:
+                                    col = diet_color(POLY, c.cls)
+                                map_surf.set_at((px, py), col)
+        else:
+            # Fallback to direct iteration for small populations
+            for c in cells:
+                if 0 <= c.x < world_w and 0 <= c.y < world_h:
+                    px = int(c.x * map_scale_x)
+                    py = int(c.y * map_scale_y)
+                    if c.genome.diet == PHOT:
+                        col = diet_color(PHOT, c.cls)
+                    elif c.genome.diet == ZOOP:
+                        col = diet_color(ZOOP, c.cls)
+                    else:
+                        col = diet_color(POLY, c.cls)
+                    map_surf.set_at((px, py), col)
+
+        # Dead cells (corpses) - also use spatial grid optimization
+        if len(corpses) > 20:
+            grid = build_spatial_grid(corpses)
+            for cx in range(int(cam_x / CELL_SIZE) - 3, int(cam_x / CELL_SIZE) + 3):
+                for cy in range(int(cam_y / CELL_SIZE) - 3, int(cam_y / CELL_SIZE) + 3):
+                    if (cx, cy) in grid:
+                        for idx in grid[(cx, cy)]:
+                            cp = corpses[idx]
+                            if 0 <= cp.x < world_w and 0 <= cp.y < world_h:
+                                map_surf.set_at(
+                                    (int(cp.x * map_scale_x), int(cp.y * map_scale_y)),
+                                    (150, 90, 90),
+                                )
+        else:
+            for cp in corpses:
+                if 0 <= cp.x < world_w and 0 <= cp.y < world_h:
+                    map_surf.set_at(
+                        (int(cp.x * map_scale_x), int(cp.y * map_scale_y)),
+                        (150, 90, 90),
+                    )
+
         # Camera rect
         cam_rect = pygame.Rect(
             int((cam_x - (W - SB) / 2 / zoom) * map_scale_x),

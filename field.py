@@ -295,21 +295,20 @@ class ResourceField:
 
         # Hotspot boost
         for hs in self.hotspots:
-            if abs(hs[0] - x) + abs(hs[1] - y) <= 3:
+            if (hs[0] - x) ** 2 + (hs[1] - y) ** 2 <= 9:  # 3px radius (squared)
                 multiplier = 2.0
                 break
 
         # Nutrient-cluster boost
         for i, (cx, cy, cl_amount) in enumerate(self.nutrient_clusters):
-            if (
-                cl_amount > CORPSE_NUTRIENT_MIN_AMOUNT
-                and abs(cx - x) + abs(cy - y) <= CORPSE_NUTRIENT_BOOST_RADIUS
-            ):
-                multiplier = CORPSE_NUTRIENT_BOOST_MULT
-                consumed = min(cl_amount, amt * 0.5)
-                self.nutrient_clusters[i][2] -= consumed
-                t += consumed * CORPSE_NUTRIENT_EXTRA_ENERGY
-                break
+            if cl_amount > CORPSE_NUTRIENT_MIN_AMOUNT:
+                dist_sq = (cx - x) ** 2 + (cy - y) ** 2
+                if dist_sq <= CORPSE_NUTRIENT_BOOST_RADIUS ** 2:
+                    multiplier = CORPSE_NUTRIENT_BOOST_MULT
+                    consumed = min(cl_amount, amt * 0.5)
+                    self.nutrient_clusters[i][2] -= consumed
+                    t += consumed * CORPSE_NUTRIENT_EXTRA_ENERGY
+                    break
 
         return t * multiplier
 
@@ -334,40 +333,42 @@ class ResourceField:
         buf[:, :, 1] = (g * gc).astype(np.uint8)
         buf[:, :, 2] = (g * bc).astype(np.uint8)
 
+        del buf  # unlock _fsurf so we can blit onto it
+
         # Highlight hotspots
         for hx, hy, hv in self.hotspots:
             if 0 <= hx < w and 0 <= hy < h and d[hx, hy] > 0:
                 b = int(hv * 255)
                 buf[hx, hy] = (b // 2, b, 0)
 
-        # Highlight nutrient clusters — irregular organic puddle shape
+        # Highlight nutrient clusters
         for cx, cy, amount in self.nutrient_clusters:
             if 0 <= cx < w and 0 <= cy < h and amount > CORPSE_NUTRIENT_MIN_AMOUNT:
-                # Irregular organic puddle: build a polygon with modulated radius
-                # per angle segment to create a non-square, non-circular smear
-                r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4) + 2)
-                if r < 2:
-                    r = 2
                 it = int(min(255, amount * 30))
-                # Use cluster position + amount as a deterministic seed
-                seed = int((cx * 7 + cy * 13 + amount * 1000)) % 10000
-                # Build an irregular polygon by modulating radius per angle
-                points = []
-                for angle_i in range(36):
-                    angle = angle_i * math.tau / 36
-                    # Modulate radius with multiple sine waves for organic shape
-                    rad_mod = (
-                        1.0
-                        + 0.35 * math.sin(seed * 0.013 + angle_i * 0.7)
-                        + 0.25 * math.cos(seed * 0.017 + angle_i * 0.5)
-                        + 0.20 * math.sin(seed * 0.023 + angle_i * 1.1)
-                    )
-                    rr = r * rad_mod
-                    px = int(cx + math.cos(angle) * rr)
-                    py = int(cy + math.sin(angle) * rr)
-                    points.append((px, py))
-                if len(points) >= 3:
-                    pygame.draw.polygon(self._fsurf, (it, it // 2, 0), points)
+                r = min(int(CORPSE_NUTRIENT_DRAW_MAX), int(amount * 0.4))
+                # Core cluster circle
+                pygame.draw.circle(self._fsurf, (it, it // 2, 0), (cx, cy), max(1, r))
 
-        del buf
+                # Irregular organic halo around the cluster
+                halo_r = CORPSE_NUTRIENT_BOOST_RADIUS
+                seed = int((cx * 7 + cy * 13 + amount * 1000)) % 10000
+                halo_pts = []
+                for ai in range(48):
+                    ang = ai * math.tau / 48
+                    mod = (
+                        1.0
+                        + 0.35 * math.sin(seed * 0.013 + ai * 0.7)
+                        + 0.25 * math.cos(seed * 0.017 + ai * 0.5)
+                        + 0.20 * math.sin(seed * 0.023 + ai * 1.1)
+                    )
+                    rr = halo_r * mod
+                    px = int(cx + math.cos(ang) * rr)
+                    py = int(cy + math.sin(ang) * rr)
+                    halo_pts.append((px, py))
+                if len(halo_pts) >= 3:
+                    # Semi-transparent organic halo
+                    halo_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+                    pygame.draw.polygon(halo_surf, (it, it // 2, 0, 40), halo_pts)
+                    self._fsurf.blit(halo_surf, (0, 0))
+
         surf.blit(self._fsurf, (0, 0))
