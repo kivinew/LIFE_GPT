@@ -517,16 +517,16 @@ class Cell:
                     # Compare energy: only attack if target is weaker or equal
                     # If target is stronger, trigger flee reaction instead
                     if other.energy > my_energy:
-                        # Target is stronger - flee
+                        # Target is stronger - flee (but don't override an existing attack on a weaker target)
                         if (
                             self.reaction_type != "flee"
-                            or self.reaction_target != other
+                            and self.reaction_target != other
+                            and self.reaction_type != "attack"
                         ):
                             self.reaction_target = other
                             self.reaction_type = "flee"
                             self.reaction_timer = 120
                         continue
-
                     if my_diet == PHOT:
                         dmg_mult = self.genome.dmg_phot
                     elif my_diet == ZOOP:
