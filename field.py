@@ -404,15 +404,13 @@ class ResourceField:
                     cg = cell_color[1]
                     cb = cell_color[2]
                     g_ = (intensities[active] * 255).astype(np.uint8)
+                    # Use PixelArray for batch pixel writes
                     pa = pygame.PixelArray(self._fsurf)
                     for i in range(len(gy[active])):
-                        gx_i = int(gx[active][i])
-                        gy_i = int(gy[active][i])
-                        g_val = int(g_[i])
-                        pa[gy_i, gx_i] = (
-                            g_val * cr // 255,
-                            g_val * cg // 255,
-                            g_val * cb // 255,
+                        pa[int(gy[active][i]), int(gx[active][i])] = (
+                            int(g_[i]) * cr // 255,
+                            int(g_[i]) * cg // 255,
+                            int(g_[i]) * cb // 255,
                         )
                     del pa
 
