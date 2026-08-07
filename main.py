@@ -162,6 +162,7 @@ def process_deaths(cells, field, corpses):
                 * c.genome.mass
                 * ENERGY_MASS_COEFF
                 * DECOMPOSITION_NUTRIENT_FRACTION,
+                c.color,
             )
             corpses.append(Corpse(c.x, c.y, c.genome.mass))
             play_sound("death")

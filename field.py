@@ -201,7 +201,7 @@ class ResourceField:
                         0.0, self.data[pos[0], pos[1]] - 0.01
                     )
 
-    def add_nutrient_cluster(self, x, y, amount) -> None:
+    def add_nutrient_cluster(self, x, y, amount, cell_color=None) -> None:
         x, y = int(x), int(y)
         if 0 <= x < self.w and 0 <= y < self.h and amount > 0.01:
             # Precompute an irregular organic puddle mask for this cluster
@@ -250,7 +250,7 @@ class ResourceField:
             # Organic falloff: radial with noise modulation (breaks perfect radial symmetry)
             base_falloff = np.clip(1.0 - dist_m / np.maximum(boundary_r, 1), 0, 1)
             falloff = base_falloff * (0.5 + 0.5 * noise)
-            self.nutrient_clusters.append([x, y, amount, puddle_mask, falloff, max_r])
+            self.nutrient_clusters.append([x, y, amount, puddle_mask, falloff, max_r, cell_color])
 
     # ── Temperature effects on regeneration ──
     def _get_temp_regen_factor(self) -> float:
@@ -326,7 +326,9 @@ class ResourceField:
             cx, cy, amount = cluster[0], cluster[1], cluster[2]
             if amount > 0.1:
                 if 0 <= cx < w and 0 <= cy < h:
-                    pass  # Center food regen handled via puddle_mask in step()
+                    d[cx, cy] = min(
+                        1.0, d[cx, cy] + amount * CORPSE_NUTRIENT_FIELD_RATE * 1.0
+                    )
                 amount *= nutrient_fade
                 # Preserve precomputed mask/falloff/max_r
                 new_clusters.append([cx, cy, amount] + list(cluster[3:]))
@@ -384,21 +386,40 @@ class ResourceField:
         buf[:, :, 1] = (g * gc).astype(np.uint8)
         buf[:, :, 2] = (g * bc).astype(np.uint8)
 
-        del buf  # unlock _fsurf so we can blit onto it
+        del buf  # unlock _fsurf before creating PixelArray
+
+        # Highlight nutrient clusters — organic shape, colored by dead cell
+        for cluster in self.nutrient_clusters:
+            cx, cy, amount, cluster_mask, falloff, cluster_max_r = cluster[0], cluster[1], cluster[2], cluster[3], cluster[4], cluster[5]
+            cell_color = cluster[6] if len(cluster) > 6 else None
+            if amount > CORPSE_NUTRIENT_MIN_AMOUNT and cell_color is not None:
+                # Recolor food pixels within the organic mask to the dead cell's color
+                my_y, mx_x = np.where(cluster_mask)
+                gy = np.clip(cx - cluster_max_r + mx_x, 0, w - 1)
+                gx = np.clip(cy - cluster_max_r + my_y, 0, h - 1)
+                intensities = d[gy, gx]
+                active = intensities > 0.01
+                if np.any(active):
+                    cr = cell_color[0]
+                    cg = cell_color[1]
+                    cb = cell_color[2]
+                    g_ = (intensities[active] * 255).astype(np.uint8)
+                    pa = pygame.PixelArray(self._fsurf)
+                    for i in range(len(gy[active])):
+                        gx_i = int(gx[active][i])
+                        gy_i = int(gy[active][i])
+                        g_val = int(g_[i])
+                        pa[gy_i, gx_i] = (
+                            g_val * cr // 255,
+                            g_val * cg // 255,
+                            g_val * cb // 255,
+                        )
+                    del pa
 
         # Highlight hotspots
         for hx, hy, hv in self.hotspots:
             if 0 <= hx < w and 0 <= hy < h and d[hx, hy] > 0:
                 b = int(hv * 255)
                 self._fsurf.set_at((hx, hy), (b // 2, b, 0))
-
-        # Highlight nutrient clusters — organic shape, no square halo
-        for cluster in self.nutrient_clusters:
-            if len(cluster) > 5:
-                cx, cy, amount, mask, falloff, cluster_max_r = cluster
-                if amount > CORPSE_NUTRIENT_MIN_AMOUNT and 0 <= cx < w and 0 <= cy < h:
-                    # The data already contains the organic-shaped cluster from step()
-                    # Just ensure the display reflects the actual data shape
-                    pass
 
         surf.blit(self._fsurf, (0, 0))
