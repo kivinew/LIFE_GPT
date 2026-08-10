@@ -4,7 +4,6 @@
 import sys
 import os
 import random
-import math
 import base64
 import json
 
@@ -99,6 +98,8 @@ from config import (
     SEASON_FACTORS,
     SEASON_TEMPERATURES,
     TEMP_SMOOTH_RATE,
+    FIXED_DT,
+    MAX_FRAME_SKIP,
     tr,
     tr_diet,
 )
@@ -106,7 +107,7 @@ from config import (
 from field import ResourceField
 from cell import Cell, Corpse, diet_color, set_sounds, play_sound
 from genome import Genome
-from spatial import build_spatial_grid, get_neighbors
+from spatial import build_spatial_grid, get_neighbors, SpatialGrid, SpatialGrid
 from memory import CellMemory
 from logger import init_logging, log_tick, close_logging
 from ui import Slider, SliderInt, PopulationGraph, VBox
@@ -114,11 +115,20 @@ from hotkeys import handle_key, HotkeyState
 
 # Cython backend (optional)
 try:
-    from sim_core import apply_physics, apply_metabolism_and_feeding, simulate_step
+    from sim_core import apply_physics, apply_metabolism_and_feeding
 
     _HAVE_SIM_CORE = True
 except ImportError:
     _HAVE_SIM_CORE = False
+
+# Optional Cython sensory acceleration (not in all .pyd builds)
+_HAVE_CY_FOOD_SENSE = False
+if _HAVE_SIM_CORE:
+    try:
+        from sim_core import cy_sense_food
+        _HAVE_CY_FOOD_SENSE = True
+    except (ImportError, AttributeError):
+        pass
 
 # Project directory for asset loading
 _project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -173,13 +183,31 @@ def process_deaths(cells, field, corpses):
 
 
 # ═══════════════════════════════════════════════════════════════════════
-def _pick_cell(cells, wx, wy, zoom):
-    """Return the topmost cell under the world point (wx, wy), or None."""
-    for c in cells:
-        if (
-            math.hypot(c.x - wx, c.y - wy)
-            < max(3, int(2 + c.genome.mass * 1.5)) * zoom + 4
-        ):
+def _pick_cell(cells, wx, wy, zoom, grid=None):
+    """Return the topmost cell under the world point (wx, wy), or None.
+
+    Uses spatial grid for O(k) lookup when grid is provided; falls back to
+    O(N) linear scan otherwise. Candidate indices are sorted to preserve
+    the same selection order as the original linear scan.
+    """
+    if grid is not None:
+        gx, gy = int(wx / CELL_SIZE), int(wy / CELL_SIZE)
+        candidates = []
+        for ngx in range(gx - 9, gx + 10):
+            for ngy in range(gy - 9, gy + 10):
+                cell_list = grid.get((ngx, ngy))
+                if cell_list:
+                    candidates.extend(cell_list)
+        candidates.sort()
+    else:
+        candidates = range(len(cells))
+
+    for idx in candidates:
+        c = cells[idx]
+        cr = max(3, int(2 + c.genome.mass * 1.5)) * zoom + 4
+        dx = c.x - wx
+        dy = c.y - wy
+        if dx * dx + dy * dy < cr * cr:
             return c
     return None
 
@@ -316,13 +344,15 @@ def eat_corpses(cells, corpses, dt):
             continue
         # Find best eater within eat radius (POLY only)
         eater = None
-        best_d = CORPSE_EAT_RADIUS
+        best_d_sq = CORPSE_EAT_RADIUS ** 2
         for c in cells:
             if c.energy <= 0 or c.genome.diet != POLY:
                 continue
-            d = math.hypot(c.x - cp.x, c.y - cp.y)
-            if d < best_d:
-                best_d = d
+            dx = c.x - cp.x
+            dy = c.y - cp.y
+            d_sq = dx * dx + dy * dy
+            if d_sq < best_d_sq:
+                best_d_sq = d_sq
                 eater = c
         if eater is not None:
             gain = CORPSE_EAT_RATE * dt
@@ -334,8 +364,9 @@ def eat_corpses(cells, corpses, dt):
         for c in cells:
             if c.energy <= 0 or c.genome.diet != ZOOP:
                 continue
-            d = math.hypot(c.x - cp.x, c.y - cp.y)
-            if d < CORPSE_ATTRACT_RADIUS:
+            dx = c.x - cp.x
+            dy = c.y - cp.y
+            if dx * dx + dy * dy < CORPSE_ATTRACT_RADIUS ** 2:
                 # Small energy gain for scavenging nearby
                 c.energy = min(
                     c.max_energy,
@@ -375,11 +406,11 @@ def main():
     set_sounds(_sounds)
 
     clock = pygame.time.Clock()
-    big = pygame.font.SysFont(None, 30)
-    font = pygame.font.SysFont(None, 18)
-    small = pygame.font.SysFont(None, 14)
-    tiny = pygame.font.SysFont(None, 12)
-    legend = pygame.font.SysFont(None, 20)
+    big = pygame.font.Font(None, 30)
+    font = pygame.font.Font(None, 18)
+    small = pygame.font.Font(None, 14)
+    tiny = pygame.font.Font(None, 12)
+    legend = pygame.font.Font(None, 20)
 
     field = ResourceField(W - SB, H)
     cells = [
@@ -546,6 +577,7 @@ def main():
     running = True
     tick = 0
     divisions = 0
+    sim_accumulator = 0.0  # For fixed-step simulation loop
     follow_mode = False
     show_stats = True
     show_minimap = True
@@ -561,6 +593,12 @@ def main():
     init_logging()
     # Reduced history for better performance with many cells
     pop_graph = PopulationGraph(history_length=2000, sample_interval=10)
+
+    # ── Fixed-step simulation parameters ──────────────────────────────────
+    FIXED_DT = 1.0 / 60.0  # Fixed timestep: 60 Hz simulation
+    MAX_SUBSTEPS = 5       # Maximum sub-steps per frame (prevents spiral of death)
+    sim_accumulator = 0.0  # Time accumulator for fixed-step
+    prev_cells_state = None  # Previous frame state for interpolation
 
     st = HotkeyState(
         cells=cells,
@@ -602,11 +640,38 @@ def main():
     # ── Main loop ──────────────────────────────────────────────────────
     prev_diet = sl_diet_val
     regen_base = sl_regen.val  # user-set base % (effective % is shown on the slider)
+    # Спатиальная сетка с dirty flag — перестраивается только при движении клеток
+    grid_wrapper = SpatialGrid(cells)
+    # Кэш минимапы: переиспользуем поверхность и 1x1 dot-surface вместо set_at()
+    map_surf = pygame.Surface((map_size, map_size))
+
+    def _make_dot(col):
+        """Создать кэшируемую 1x1 surface для минимапы."""
+        dot = pygame.Surface((1, 1))
+        dot.set_at((0, 0), col)
+        return dot
+
+    _dot_cache = {}
+    _corpses_dot = _make_dot((150, 90, 90))
+    _sel_cross = pygame.Surface((5, 5), pygame.SRCALPHA)
+    for _dx in range(-2, 3):
+        for _dy in range(-2, 3):
+            if _dx != 0 or _dy != 0:
+                _sel_cross.set_at((_dx + 2, _dy + 2), (255, 0, 0))
     while running:
         mx, my = pygame.mouse.get_pos()
         wx, wy = screen_to_world(mx, my, cam_x, cam_y, zoom)
-        dt = clock.tick(60) / 16.0 * sl_time.val
-
+        
+        # Fixed-step simulation: accumulate real time, run fixed dt steps
+        real_dt_ms = clock.tick(60)
+        real_dt_s = real_dt_ms / 1000.0 * sl_time.val
+        sim_accumulator += real_dt_s
+        
+        # Limit to prevent spiral of death
+        if sim_accumulator > MAX_FRAME_SKIP * FIXED_DT:
+            sim_accumulator = MAX_FRAME_SKIP * FIXED_DT
+        
+        # Season calculation uses tick (unchanged)
         season_idx = (tick // SEASON_LENGTH) % 4
         season_name = SEASON_ORDER[season_idx]
         season_factor = SEASON_FACTORS[season_name]
@@ -758,7 +823,9 @@ def main():
                     continue
                 in_world = wx < W - SB and not map_rect.collidepoint(e.pos)
 
-                hit = _pick_cell(cells, wx, wy, zoom) if in_world else None
+                if in_world:
+                    grid_wrapper.refresh()
+                hit = _pick_cell(cells, wx, wy, zoom, grid_wrapper.grid) if in_world else None
 
                 if hit is not None:
                     sel_cell = _apply_selection(cells, hit, shift, alt)
@@ -798,7 +865,7 @@ def main():
                 and wx < W - SB
                 and not map_rect.collidepoint(e.pos)
                 and not add_mode
-                and _pick_cell(cells, wx, wy, zoom) is None
+                and _pick_cell(cells, wx, wy, zoom, grid_wrapper.grid) is None
             ):
                 marquee_active = True
                 marquee_start = e.pos
@@ -853,43 +920,65 @@ def main():
 
         # Debug print every 100 ticks
         if not paused:
-            tick += 1
-            if tick % 100 == 0:
-                print(f"Tick: {tick}, Cells: {len(cells)}")
+            # Fixed-step simulation loop
+            while sim_accumulator >= FIXED_DT:
+                sim_accumulator -= FIXED_DT
+                tick += 1
+                if tick % 100 == 0:
+                    print(f"Tick: {tick}, Cells: {len(cells)}")
 
-            # Temperature: seasons drive it, slider bias offsets it — moves gradually
-            target_temp = max(0.0, min(1.0, season_temp + sl_temp._bias))
-            field.temperature += (target_temp - field.temperature) * TEMP_SMOOTH_RATE
-            sl_temp.val = -10.0 + field.temperature * 45.0
+                # Temperature: seasons drive it, slider bias offsets it — moves gradually
+                target_temp = max(0.0, min(1.0, season_temp + sl_temp._bias))
+                field.temperature += (target_temp - field.temperature) * TEMP_SMOOTH_RATE
+                sl_temp.val = -10.0 + field.temperature * 45.0
 
-            # Food regen: smooth season multiplier (interpolate toward next season)
-            regen_mult_target = season_factor["regen_mult"]
-            regen_mult_target += (
-                SEASON_FACTORS[SEASON_ORDER[(season_idx + 1) % 4]]["regen_mult"]
-                - regen_mult_target
-            ) * season_progress
+                # Food regen: smooth season multiplier (interpolate toward next season)
+                regen_mult_target = season_factor["regen_mult"]
+                regen_mult_target += (
+                    SEASON_FACTORS[SEASON_ORDER[(season_idx + 1) % 4]]["regen_mult"]
+                    - regen_mult_target
+                ) * season_progress
 
-            # Food regen: slider is a % (0–100), moves toward target gradually.
-            # The slider shows the EFFECTIVE % (base × season × temperature);
-            # dragging it sets the base % (temperature/season scaled back out).
-            regen_mult = regen_mult_target * field._get_temp_regen_factor()
-            if sl_regen.drag and regen_mult > 0.0:
-                regen_base = min(100.0, max(0.0, sl_regen.val / regen_mult))
-            target_regen_val = min(100.0, regen_base * regen_mult)
-            sl_regen.val += (target_regen_val - sl_regen.val) * 0.05
-            target_regen = (regen_base / 100.0) * REGEN_MAX_RATE * regen_mult_target
-            field.base_regen += (target_regen - field.base_regen) * REGEN_SMOOTH_RATE
+                # Food regen: slider is a % (0–100), moves toward target gradually.
+                # The slider shows the EFFECTIVE % (base × season × temperature);
+                # dragging it sets the base % (temperature/season scaled back out).
+                regen_mult = regen_mult_target * field._get_temp_regen_factor()
+                if sl_regen.drag and regen_mult > 0.0:
+                    regen_base = min(100.0, max(0.0, sl_regen.val / regen_mult))
+                target_regen_val = min(100.0, regen_base * regen_mult)
+                sl_regen.val += (target_regen_val - sl_regen.val) * 0.05
+                target_regen = (regen_base / 100.0) * REGEN_MAX_RATE * regen_mult_target
+                field.base_regen += (target_regen - field.base_regen) * REGEN_SMOOTH_RATE
 
-            # Field update
-            field.diff = sl_diffuse.val
-            field.zoophagy_mult = sl_zoophagy.val
-            food_decay_rate = 1.0 / max(1.0, sl_food_lifetime.val)
-            field.step(dt, len(cells), decay_rate=food_decay_rate, nutrient_fade=1.0 - 50.0 / sl_food_areola_lifetime.val)
+                # Field update
+                field.diff = sl_diffuse.val
+                field.zoophagy_mult = sl_zoophagy.val
+                food_decay_rate = 1.0 / max(1.0, sl_food_lifetime.val)
+                field.step(FIXED_DT, len(cells), decay_rate=food_decay_rate, nutrient_fade=1.0 - 50.0 / sl_food_areola_lifetime.val)
 
             # Simulation
+            grid_wrapper.refresh()
             if _HAVE_SIM_CORE:
+                # Bulk food ray sampling (Cython-accelerated sensory_phase)
+                if _HAVE_CY_FOOD_SENSE and cells:
+                    _n = len(cells)
+                    _xs = np.array([c.x for c in cells], dtype=np.float64)
+                    _ys = np.array([c.y for c in cells], dtype=np.float64)
+                    _di = np.array([c.genome.diet for c in cells], dtype=np.int32)
+                    _sense = np.array(
+                        [max(8.0, c.genome.sense) for c in cells], dtype=np.float64
+                    )
+                    _bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
+                    _bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
+                    cy_sense_food(_xs, _ys, _di, _sense, _bdx, _bdy,
+                                  field.data, _n, W - SB, H)
+                    for i, c in enumerate(cells):
+                        c.best_dir = (float(_bdx[i]), float(_bdy[i]))
+
+                # Per-cell sensory (neighbor-based logic; food rays done by cy_sense_food)
                 for c in cells:
-                    c.sensory_phase(field, cells, None, dt)
+                    c.sensory_phase(field, cells, grid_wrapper.grid, FIXED_DT,
+                                    skip_food_ray=_HAVE_CY_FOOD_SENSE)
                 n = len(cells)
                 if n > 0:
                     xs = np.array([c.x for c in cells], dtype=np.float64)
@@ -938,8 +1027,8 @@ def main():
                     td = np.zeros(n, dtype=np.int8)
                     fd = field.data.copy()
 
-                    apply_physics(xs, ys, bdx, bdy, sp, dt)
-                    apply_metabolism_and_feeding(xs, ys, de, di, sp, ma, me, le, fd, dt)
+                    apply_physics(xs, ys, bdx, bdy, sp, FIXED_DT)
+                    apply_metabolism_and_feeding(xs, ys, de, di, sp, ma, me, le, fd, FIXED_DT)
                     field.data[:] = fd
 
                     for i, c in enumerate(cells):
@@ -951,18 +1040,17 @@ def main():
 
                     for c in cells:
                         if c.energy > 0:
-                            c.post_step(field, cells, None, td, dt, 0)
+                            c.post_step(field, cells, grid_wrapper.grid, td, FIXED_DT, 0)
             else:
-                grid = build_spatial_grid(cells)
                 for c in cells:
                     if c.energy > 0:
-                        c.step(field, cells, grid, dt, 0)
+                        c.step(field, cells, grid_wrapper.grid, FIXED_DT, 0)
 
             # ── Corpse feeding, death & decomposition ────────────────
-            eat_corpses(cells, corpses, dt)
+            eat_corpses(cells, corpses, FIXED_DT)
             process_deaths(cells, field, corpses)
             for cp in corpses[:]:
-                cp.update(dt)
+                cp.update(FIXED_DT, temperature=field.temperature)
                 if cp.done:
                     corpses.remove(cp)
 
@@ -1203,7 +1291,7 @@ def main():
 
 
         # ── UI: Mini-map (right column) ─────────────────────────────────
-        map_surf = pygame.Surface((map_size, map_size))
+        # Переиспользуем map_surf вместо создания новой поверхности каждый кадр
         if hasattr(field, "_fsurf"):
             # Downscale the field surface to show nutrient-value density
             pygame.transform.smoothscale(field._fsurf, (map_size, map_size), map_surf)
@@ -1215,66 +1303,54 @@ def main():
         if len(cells) > 20:
             grid = build_spatial_grid(cells)
             # Get all cells that could potentially be in the map view
-            for cx in range(int(cam_x / CELL_SIZE) - 3, int(cam_x / CELL_SIZE) + 3):
-                for cy in range(int(cam_y / CELL_SIZE) - 3, int(cam_y / CELL_SIZE) + 3):
+            for cx in range(int(cam_x / CELL_SIZE) - 9, int(cam_x / CELL_SIZE) + 9):
+                for cy in range(int(cam_y / CELL_SIZE) - 9, int(cam_y / CELL_SIZE) + 9):
                     if (cx, cy) in grid:
                         for idx in grid[(cx, cy)]:
                             c = cells[idx]
                             if 0 <= c.x < world_w and 0 <= c.y < world_h:
                                 px = int(c.x * map_scale_x)
                                 py = int(c.y * map_scale_y)
-                                if c.genome.diet == PHOT:
-                                    col = diet_color(PHOT, c.cls)
-                                elif c.genome.diet == ZOOP:
-                                    col = diet_color(ZOOP, c.cls)
-                                else:
-                                    col = diet_color(POLY, c.cls)
-                                map_surf.set_at((px, py), col)
+                                key = (c.genome.diet, c.cls)
+                                if key not in _dot_cache:
+                                    _dot_cache[key] = _make_dot(diet_color(c.genome.diet, c.cls))
+                                map_surf.blit(_dot_cache[key], (px, py))
         else:
             # Fallback to direct iteration for small populations
             for c in cells:
                 if 0 <= c.x < world_w and 0 <= c.y < world_h:
                     px = int(c.x * map_scale_x)
                     py = int(c.y * map_scale_y)
-                    if c.genome.diet == PHOT:
-                        col = diet_color(PHOT, c.cls)
-                    elif c.genome.diet == ZOOP:
-                        col = diet_color(ZOOP, c.cls)
-                    else:
-                        col = diet_color(POLY, c.cls)
-                    map_surf.set_at((px, py), col)
+                    key = (c.genome.diet, c.cls)
+                    if key not in _dot_cache:
+                        _dot_cache[key] = _make_dot(diet_color(c.genome.diet, c.cls))
+                    map_surf.blit(_dot_cache[key], (px, py))
 
         # Highlight selected cell on minimap
         if sel_cell and 0 <= sel_cell.x < world_w and 0 <= sel_cell.y < world_h:
             px = int(sel_cell.x * map_scale_x)
             py = int(sel_cell.y * map_scale_y)
-            # Draw red crosshair for selected cell
-            map_surf.set_at((px, py), (255, 0, 0))
-            # Draw small cross to make it more visible
-            for dx in [-2, -1, 0, 1, 2]:
-                for dy in [-2, -1, 0, 1, 2]:
-                    if dx != 0 or dy != 0:
-                        map_surf.set_at((px + dx, py + dy), (255, 0, 0))
+            map_surf.blit(_sel_cross, (px - 2, py - 2))
 
         # Dead cells (corpses) - also use spatial grid optimization
         if len(corpses) > 20:
             grid = build_spatial_grid(corpses)
-            for cx in range(int(cam_x / CELL_SIZE) - 3, int(cam_x / CELL_SIZE) + 3):
-                for cy in range(int(cam_y / CELL_SIZE) - 3, int(cam_y / CELL_SIZE) + 3):
+            for cx in range(int(cam_x / CELL_SIZE) - 9, int(cam_x / CELL_SIZE) + 9):
+                for cy in range(int(cam_y / CELL_SIZE) - 9, int(cam_y / CELL_SIZE) + 9):
                     if (cx, cy) in grid:
                         for idx in grid[(cx, cy)]:
                             cp = corpses[idx]
                             if 0 <= cp.x < world_w and 0 <= cp.y < world_h:
-                                map_surf.set_at(
+                                map_surf.blit(
+                                    _corpses_dot,
                                     (int(cp.x * map_scale_x), int(cp.y * map_scale_y)),
-                                    (150, 90, 90),
                                 )
         else:
             for cp in corpses:
                 if 0 <= cp.x < world_w and 0 <= cp.y < world_h:
-                    map_surf.set_at(
+                    map_surf.blit(
+                        _corpses_dot,
                         (int(cp.x * map_scale_x), int(cp.y * map_scale_y)),
-                        (150, 90, 90),
                     )
 
         # Camera rect

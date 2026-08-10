@@ -1,0 +1,11 @@
+{
+  "id": "P7",
+  "title": "\u0420\u043e\u0434\u0438\u0442\u044c \u0446\u0432\u0435\u0442 \u043b\u0443\u0436\u0438 \u043f\u043e\u0441\u043b\u0435 \u0433\u0438\u0431\u0435\u043b\u0438 \u043a\u043b\u0435\u0442\u043a\u0438",
+  "priority": "P1",
+  "details": "\u0421\u0434\u0435\u043b\u0430\u0442\u044c \u0446\u0432\u0435\u0442 \u043e\u0440\u0433\u0430\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0445 \u043b\u0443\u0436 \u043f\u0438\u0449\u0438 \u0438\u0437 \u043c\u0451\u0440\u0442\u0432\u044b\u0445 \u043a\u043b\u0435\u0442\u043e\u043a \u0442\u043e\u0433\u043e \u0436\u0435 \u0446\u0432\u0435\u0442\u0430, \u0447\u0442\u043e \u0438 \u0441\u0430\u043c\u0430 \u043a\u043b\u0435\u0442\u043a\u0430. \u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0446\u0432\u0435\u0442 \u043a\u043b\u0435\u0442\u043a\u0438 \u043f\u0440\u0438 \u0441\u043e\u0437\u0434\u0430\u043d\u0438\u0438 Corpse (cell.py) \u0438 \u043f\u0435\u0440\u0435\u0434\u0430\u0442\u044c \u0435\u0433\u043e \u0432 field.py.add_nutrient_cluster \u0434\u043b\u044f \u0440\u0430\u0441\u043a\u0440\u0430\u0448\u0438\u0432\u0430\u043d\u0438\u044f \u043e\u0440\u0433\u0430\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0445 \u043c\u0430\u0441\u043e\u043a.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T23:15:24.010074",
+  "done_at": "2026-08-09T23:16:40.070530",
+  "notes": "Stale task - already implemented by prior commits. Corpse puddle color inheritance is complete: (1) process_deaths passes c.color to add_nutrient_cluster; (2) field.py stores cell_color in nutrient_clusters as cluster[6]; (3) draw() recolors organic mask pixels via PixelArray with intensity scaling (cell_color * data_value). Verified code is correct and complete. No changes needed."
+}

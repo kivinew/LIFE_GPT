@@ -52,3 +52,7 @@ package-lock.json
 # Claude/mimocode internal
 .mimocode/
 .claude/settings.local.json
+
+# Agent coordination artifacts (not versioned)
+.locks/
+.agent_logs/

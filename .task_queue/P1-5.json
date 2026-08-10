@@ -1,0 +1,17 @@
+{
+  "id": "P1-5",
+  "title": "Batch minimap rendering \u0432\u0402\u201d cached 1x1 dot surfaces",
+  "priority": "P1",
+  "details": "main.py minimap uses per-pixel set_at() every frame. Create cached 1x1 dot surfaces per class and blit them instead. Also cache the minimap surface between frames instead of recreating.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T22:31:12.262102",
+  "done_at": "2026-08-09T22:39:57.374781",
+  "notes": "Minimap optimization: (1) Cached map_surf before loop \u2014 reuse Surface instead of creating new one each frame; (2) Cached 1x1 dot surfaces per (diet, cls) via _dot_cache + _make_dot, blit instead of set_at; (3) Cached _corpses_dot (1x1, (150,90,90)) and _sel_cross (5x5 crosshair); (4) Simplified diet_color lookup (removed 3-way if/elif). set_at reduced from ~11 per frame to 2 init-only calls. Tests passed.",
+  "files": [
+    "main.py"
+  ],
+  "lines": [
+    "minimap rendering section"
+  ]
+}

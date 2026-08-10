@@ -1,0 +1,11 @@
+{
+  "id": "P6",
+  "title": "\u0421\u043d\u0438\u0437\u0438\u0442\u044c \u0448\u0430\u043d\u0441 \u043c\u0443\u0442\u0430\u0446\u0438\u0438 \u0438\u0437 \u0444\u0438\u0442\u043e \u0432 \u0437\u043e\u043e",
+  "priority": "P1",
+  "details": "\u0421\u043d\u0438\u0437\u0438\u0442\u044c \u0432\u0435\u0440\u043e\u044f\u0442\u043d\u043e\u0441\u0442\u044c \u043c\u0443\u0442\u0430\u0446\u0438\u0438 \u0442\u0438\u043f\u0430 \u043f\u0438\u0442\u0430\u043d\u0438\u044f \u0441 PHOT (\u0444\u0438\u0442\u043e) \u043d\u0430 ZOOP (\u0437\u043e\u043e\u043f\u043b\u0430\u043d\u043a\u0442\u043e\u043d) \u0432 \u0441\u0438\u0441\u0442\u0435\u043c\u0435 \u043c\u0443\u0442\u0430\u0446\u0438\u0439 \u0433\u0435\u043d\u043e\u043c\u0430. \u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0448\u0430\u043d\u0441 ~0.5 \u0432 MAJOR_DIET_RATE. \u0426\u0435\u043b\u044c: 0.3 \u0438\u043b\u0438 0.2.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T23:10:55.488571",
+  "done_at": "2026-08-09T23:15:00.170152",
+  "notes": "Reduced MAJOR_DIET_RATE from 0.5 to 0.3 in config.py. Lowers PHOT to ZOOP diet mutation probability (and all diet mutations) from 50% to 30% per major mutation event. Asymmetric weights in weighted_diet preserved (PHOT->ZOOP=0.1 still 3x rarer than PHOT->POLY=0.3). Verified with 1000-mutation distribution test. No Cython rebuild needed. All tests passed."
+}

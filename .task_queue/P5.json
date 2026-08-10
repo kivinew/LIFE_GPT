@@ -1,0 +1,17 @@
+{
+  "id": "P5",
+  "title": "Generate requirements.txt from pyproject.toml",
+  "priority": "P0",
+  "details": "pyproject.toml only lists pygame but numpy and cython are missing. Generate a complete requirements.txt with: pygame>=2.5.0, numpy, cython>=3.2.9.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T19:32:28.352814",
+  "done_at": "2026-08-09T19:32:42.810082",
+  "notes": "Created requirements.txt with pygame>=2.5.0, numpy>=1.26.0, cython>=3.2.9",
+  "files": [
+    "pyproject.toml"
+  ],
+  "lines": [
+    "dependencies section"
+  ]
+}

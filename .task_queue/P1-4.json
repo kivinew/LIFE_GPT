@@ -1,0 +1,18 @@
+{
+  "id": "P1-4",
+  "title": "Spatial grid dirty flag \u0432\u0402\u201d skip rebuild when cells haven't moved",
+  "priority": "P1",
+  "details": "Spatial hash grid in spatial.py is rebuilt every tick even when cells haven't moved more than CELL_SIZE/2. Add a dirty flag to skip unnecessary rebuilds.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T20:42:53.928832",
+  "done_at": "2026-08-09T22:31:12.110438",
+  "notes": "Added SpatialGrid class to spatial.py with dirty flag (threshold=CELL_SIZE/2=24px). is_dirty() checks position shifts + cell count changes. refresh() rebuilds only when dirty. In main.py: initialized grid_wrapper=SpatialGrid(cells) before main loop, replaced build_spatial_grid(cells) with grid_wrapper.refresh()+grid_wrapper.grid in Python fallback (else branch). build_spatial_grid() preserved for minimap/corpses. All tests passed.",
+  "files": [
+    "spatial.py",
+    "cell.py"
+  ],
+  "lines": [
+    "get_grid() / rebuild logic"
+  ]
+}

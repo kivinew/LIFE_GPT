@@ -1,0 +1,18 @@
+{
+  "id": "P2",
+  "title": "Remove or integrate dead adjust_biomes_for_season from field.py",
+  "priority": "P0",
+  "details": "adjust_biomes_for_season() is defined in field.py but never called anywhere. Either wire it into the seasonal update path or remove it. Document decision in AGENT_CHECK.md.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T19:49:22.823866",
+  "done_at": "2026-08-09T20:00:13.840344",
+  "notes": "Removed dead adjust_biomes_for_season() method from field.py (59 lines including docstring). Method was never called; its docstring falsely claimed it was called from cell.py. Directly mutates self.data with hardcoded values, inconsistent with existing seasonal regen system. Biome system intact \u2014 self.biomes still used by _assign_biomes(), get_biome(), analyze_biome_distribution(). Decision documented in AGENT_CHECK.md.",
+  "files": [
+    "field.py",
+    "config.py"
+  ],
+  "lines": [
+    "adjust_biomes_for_season()"
+  ]
+}

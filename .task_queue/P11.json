@@ -1,0 +1,11 @@
+{
+  "id": "P11",
+  "title": "Grid-based cell picking",
+  "priority": "P1",
+  "details": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c spatial grid \u0434\u043b\u044f \u043f\u043e\u0438\u0441\u043a\u0430 \u0431\u043b\u0438\u0436\u0430\u0439\u0448\u0438\u0445 \u043a\u043b\u0435\u0442\u043e\u043a \u043f\u0440\u0438 \u043a\u043b\u0438\u043a\u0435 \u043c\u044b\u0448\u044c\u044e \u0432\u043c\u0435\u0441\u0442\u043e \u043f\u0435\u0440\u0435\u0431\u043e\u0440\u0430 \u0432\u0441\u0435\u0445. main.py. \u0421\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u044c O(1) \u0432\u043c\u0435\u0441\u0442\u043e O(N).",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T22:57:42.455236",
+  "done_at": "2026-08-09T23:02:31.851308",
+  "notes": "Optimized _pick_cell in main.py from O(N) linear scan to O(k) spatial grid lookup. Changes: (1) _pick_cell(cells, wx, wy, zoom) now accepts grid=None; when grid provided, narrows candidates to +/-3 grid cells around click position using spatial grid, sorts indices to preserve selection order; falls back to linear scan when grid=None (backward compatible). (2) Added grid_wrapper.refresh() before first _pick_cell call site (line ~781) to ensure grid is current, especially for Cython path where refresh is only in Python fallback. (3) Both call sites now pass grid_wrapper.grid. Tested: backward compat verified, grid path matches linear scan for all 50 test cells, 8s sim smoke test passed."
+}

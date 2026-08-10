@@ -3,6 +3,10 @@
 W, H = 1600, 900
 SB = 600
 
+# ── Fixed-step simulation ────────────────────────────────────────
+FIXED_DT = 1.0 / 60.0  # Fixed timestep (1/60 s) for deterministic simulation
+MAX_FRAME_SKIP = 5      # Max simulation steps per frame to prevent spiral of death
+
 # ── Colors (R,G,B) ───────────────────────────────────────────────
 BG = (15, 16, 20)
 WHITE = (230, 230, 230)
@@ -66,7 +70,7 @@ LEVEL_MASS_STEP = 0.6
 BASE_LIFESPAN_TICKS = 3000
 LIFESPAN_PER_MASS = 200
 AGING_DAMAGE = 0.3
-ZOO_INITIAL_ENERGY = 35.0  # Reduced from 65.0 — ZOOP starts with lower energy, must hunt to survive and grow
+ZOO_INITIAL_ENERGY = 50.0  # Raised from 35.0 — ZOOP starts with enough energy to hunt before starving
 PHOT_INITIAL_ENERGY = (
     45.0  # Added — PHOT starts with more energy to survive initial period
 )
@@ -81,7 +85,7 @@ ZOO_WEAK_TARGET_THRESHOLD = (
 )
 
 # ── Major mutation AI constants ──────────────────────────────────────
-MAJOR_DIET_RATE = 0.5  # 50% chance of major mutation creating new diet
+MAJOR_DIET_RATE = 0.3  # 30% chance of major mutation creating new diet (reduced from 0.5)
 MAJOR_SENSE_RATE = 0.5  # 50% chance of major mutation creating new sense organ
 
 # ── Learning / Memory ────────────────────────────────────────────
@@ -106,7 +110,7 @@ THREAT_FLEE_THRESHOLD = 0.3  # if threat_score > this, flee from class
 COOP_PREFER_THRESHOLD = 0.5  # if coop_score > this, prefer cooperation
 
 # ── Spatial grid ─────────────────────────────────────────────────
-CELL_SIZE = 48
+CELL_SIZE = 16  # Spatial grid cell size — reduced by 3x for finer-grained neighbor queries
 
 # ── Seasons ──────────────────────────────────────────────────────
 SEASON_ORDER = ["spring", "summer", "autumn", "winter"]
@@ -206,6 +210,7 @@ TEMP_SMOOTH_RATE = (
     0.01  # fraction of the gap covered per tick toward target temp (gradual change)
 )
 TEMP_METABOLISM_MIN = 0.5  # metabolism multiplier at temp=0.0 (cold slows metabolism)
+TEMP_FREEZE = 0.222  # internal temp at 0 deg C — below this corpses are frozen (no decomposition)
 
 # ── Temperature-dependent mutation spectrum ──────────────────────────
 # Cold environments favour gross ecological shifts (diet/niche switches);

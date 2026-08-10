@@ -1,0 +1,18 @@
+{
+  "id": "P1-2",
+  "title": "Replace math.hypot with squared-distance comparisons",
+  "priority": "P1",
+  "details": "math.hypot is called thousands of times per tick in all cell phases. Replace distance comparisons with squared-distance (dx*dx + dy*dy) to eliminate sqrt. Apply across all 14 phases in cell.step().",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T20:18:18.140237",
+  "done_at": "2026-08-09T20:30:52.433360",
+  "notes": "Replaced 6 math.hypot distance comparisons in cell.py + 3 in main.py with squared-distance (dx*dx+dy*dy), avoiding sqrt in per-neighbor hot loops. Kept 10 normalization hypot calls (need actual sqrt). Removed dead 'import math' from main.py. Tested: syntax/import/50-tick sim/8s headless smoke test all passed.",
+  "files": [
+    "cell.py",
+    "sim_core.pyx"
+  ],
+  "lines": [
+    "all distance comparisons"
+  ]
+}

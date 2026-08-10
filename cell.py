@@ -72,6 +72,7 @@ from config import (
     MIGRATION_DISTANCE,
     TEMP_ENERGY_PENALTY,
     TEMP_METABOLISM_MIN,
+    TEMP_FREEZE,
     AGING_METABOLISM_FACTOR,
     MAJOR_DIET_RATE,
     MAJOR_SENSE_RATE,
@@ -133,6 +134,41 @@ def play_sound(name: str):
             _sounds[name].play()
     except Exception:
         pass
+
+
+# Cache for cell body gradient surfaces, keyed by (cls, radius, energy_band, selected).
+# Avoids per-frame Surface allocation + r circle draws per cell — the biggest rendering cost.
+_cell_surface_cache: dict = {}
+_ENERGY_BANDS = 5  # Quantize energy_ratio into bands to bound cache size
+
+
+def _get_cached_cell_surface(cls, radius, col, energy_ratio, selected):
+    """Return a cached gradient surface for a cell body, creating it if needed.
+
+    Surfaces are immutable after creation, so they can be safely shared/blitted
+    by many cells.  The cache is keyed by (cls, radius, energy_band, selected)
+    so that color changes from refresh_class() naturally produce new entries.
+    An entire-cache flush prevents unbounded growth across long simulations.
+    """
+    band = min(_ENERGY_BANDS - 1, int(energy_ratio * _ENERGY_BANDS))
+    cache_key = (cls, radius, band, selected)
+    ss = _cell_surface_cache.get(cache_key)
+    if ss is not None:
+        return ss
+    if len(_cell_surface_cache) > 2000:
+        _cell_surface_cache.clear()
+    er = (band + 0.5) / _ENERGY_BANDS
+    bright = tuple(int(c * (0.4 + 0.6 * er)) for c in col)
+    dark = tuple(int(c * 0.2) for c in col)
+    ss = pygame.Surface((radius * 2 + 4, radius * 2 + 4), pygame.SRCALPHA)
+    cx, cy = radius + 2, radius + 2
+    for ri in range(radius, 0, -1):
+        t = ri / radius
+        alpha = int(255 * (1.0 - t * t))
+        c = tuple(int(d + (b - d) * (1.0 - t)) for d, b in zip(dark, bright))
+        pygame.draw.circle(ss, (*c, alpha), (cx, cy), ri)
+    _cell_surface_cache[cache_key] = ss
+    return ss
 
 
 class Cell:
@@ -202,31 +238,33 @@ class Cell:
         return self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
 
     # ── Phase 1: sensory ──
-    def sensory_phase(self, field, cells, grid):
+    def sensory_phase(self, field, cells, grid, dt, skip_food_ray=False):
         sense = max(8.0, self.genome.sense)
         d = self.genome.diet
-        best_score = -1.0
-        _bx, _by = random.uniform(-1, 1), random.uniform(-1, 1)
-        _bn = math.hypot(_bx, _by)
-        self.best_dir = (_bx / _bn, _by / _bn) if _bn > 0 else (0.0, 1.0)
 
-        # Cache field dimensions and data for faster access
-        fd = field.data
-        fw, fh = W - SB, H
+        if not skip_food_ray:
+            best_score = -1.0
+            _bx, _by = random.uniform(-1, 1), random.uniform(-1, 1)
+            _bn = math.hypot(_bx, _by)
+            self.best_dir = (_bx / _bn, _by / _bn) if _bn > 0 else (0.0, 1.0)
 
-        if d in (PHOT, POLY):
-            # Vectorized ray sampling - fewer iterations, more efficient
-            for _ in range(16):  # Reduced from 24
-                ang = random.random() * math.tau
-                dist = random.random() * sense
-                sx = int(self.x + math.cos(ang) * dist)
-                sy = int(self.y + math.sin(ang) * dist)
-                if 0 <= sx < fw and 0 <= sy < fh:
-                    val = fd[sx][sy]
-                    score = val / (1.0 + dist / sense)
-                    if score > best_score:
-                        best_score = score
-                        self.best_dir = (math.cos(ang), math.sin(ang))
+            # Cache field dimensions and data for faster access
+            fd = field.data
+            fw, fh = W - SB, H
+
+            if d in (PHOT, POLY):
+                # Vectorized ray sampling - fewer iterations, more efficient
+                for _ in range(16):  # Reduced from 24
+                    ang = random.random() * math.tau
+                    dist = random.random() * sense
+                    sx = int(self.x + math.cos(ang) * dist)
+                    sy = int(self.y + math.sin(ang) * dist)
+                    if 0 <= sx < fw and 0 <= sy < fh:
+                        val = fd[sx][sy]
+                        score = val / (1.0 + dist / sense)
+                        if score > best_score:
+                            best_score = score
+                            self.best_dir = (math.cos(ang), math.sin(ang))
 
         if d == PHOT and random.random() < 0.35:
             for j in get_neighbors(grid, self.x, self.y, radius=2):
@@ -293,12 +331,13 @@ class Cell:
             if rt.energy > 0:
                 dx = rt.x - self.x
                 dy = rt.y - self.y
-                dist = math.hypot(dx, dy)
-                if 0 < dist <= max(8.0, self.genome.sense):
+                dist_sq = dx * dx + dy * dy
+                if 0 < dist_sq <= (max(8.0, self.genome.sense)) ** 2:
                     if self.reaction_type == "flee":
                         angle = math.atan2(-dy, -dx) + random.uniform(-0.3, 0.3)
                         self.best_dir = (math.cos(angle), math.sin(angle))
                     elif self.reaction_type == "attack":
+                        dist = math.sqrt(dist_sq)
                         self.best_dir = (dx / dist, dy / dist)
                     self.reaction_timer -= 1
                 else:
@@ -452,8 +491,9 @@ class Cell:
                     and other.genome.diet == PHOT
                     and other.cls != self.cls
                 ):
-                    dist = math.hypot(other.x - self.x, other.y - self.y)
-                    if dist <= sense:
+                    dx = other.x - self.x
+                    dy = other.y - self.y
+                    if dx * dx + dy * dy <= sense * sense:
                         # Gain energy from prey (parasitic feeding)
                         feed_gain = min(2.0, other.energy * 0.08 * zoophagy_mult)
                         self.energy += feed_gain * COMBAT_DAMAGE_GAIN
@@ -652,8 +692,9 @@ class Cell:
             other = cells[j]
             if other is not self and other.energy > 0 and other.cls != self.cls:
                 dx, dy = self.x - other.x, self.y - other.y
-                dist = math.hypot(dx, dy)
-                if dist < self.genome.mass + other.genome.mass + 4.0:
+                dist_sq = dx * dx + dy * dy
+                mass_threshold = self.genome.mass + other.genome.mass + 4.0
+                if dist_sq < mass_threshold * mass_threshold:
                     enemy_cls = other.cls
                     known_threat = self.memory.threat(enemy_cls)
                     known_coop = self.memory.coop(enemy_cls)
@@ -712,8 +753,9 @@ class Cell:
             for j in get_neighbors(grid, self.x, self.y, radius=1):
                 other = cells[j]
                 if other is not self and other.sick:
-                    dist = math.hypot(other.x - self.x, other.y - self.y)
-                    if dist < DISEASE_TRANSMISSION_RANGE:
+                    dx = other.x - self.x
+                    dy = other.y - self.y
+                    if dx * dx + dy * dy < DISEASE_TRANSMISSION_RANGE ** 2:
                         self.sick = True
                         self.sick_timer = DISEASE_DURATION
                         play_sound("gurgle")  # Disease onset sound
@@ -764,10 +806,10 @@ class Cell:
                         and not other.infected
                         and other.genome.diet == self.genome.diet
                     ):  # Infect same diet type
-                        dist = math.hypot(other.x - self.x, other.y - self.y)
-                        if (
-                            dist <= 5.0 + self.virus_type * 2
-                        ):  # Larger radius for more dangerous viruses
+                        dx = other.x - self.x
+                        dy = other.y - self.y
+                        spread_radius = 5.0 + self.virus_type * 2
+                        if dx * dx + dy * dy <= spread_radius * spread_radius:  # Larger radius for more dangerous viruses
                             other.infected = True
                             other.infection_timer = DISEASE_DURATION * random.uniform(
                                 0.5, 2.0
@@ -782,8 +824,9 @@ class Cell:
             for j in get_neighbors(grid, self.x, self.y, radius=1):
                 other = cells[j]
                 if other is not self and other.infected and other.virus_type > 0:
-                    dist = math.hypot(other.x - self.x, other.y - self.y)
-                    if dist < 5.0:  # Close transmission
+                    dx = other.x - self.x
+                    dy = other.y - self.y
+                    if dx * dx + dy * dy < 25.0:  # Close transmission
                         self.infected = True
                         self.infection_timer = DISEASE_DURATION * random.uniform(
                             0.5, 2.0
@@ -1033,15 +1076,8 @@ class Cell:
         r = max(3, int(2 + self.genome.mass * 1.5))
         col = YEL if self.selected else self.color[:3]
         energy_ratio = max(0.0, min(1.0, self.energy / self.max_energy))
-        bright = tuple(int(c * (0.4 + 0.6 * energy_ratio)) for c in col)
-        dark = tuple(int(c * 0.2) for c in col)
-        ss = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
+        ss = _get_cached_cell_surface(self.cls, r, col, energy_ratio, self.selected)
         cx, cy = r + 2, r + 2
-        for ri in range(r, 0, -1):
-            t = ri / r
-            alpha = int(255 * (1.0 - t * t))
-            c = tuple(int(d + (b - d) * (1.0 - t)) for d, b in zip(dark, bright))
-            pygame.draw.circle(ss, (*c, alpha), (cx, cy), ri)
         surf.blit(ss, (x - cx, y - cy))
         if self.selected:
             sr = int(self.genome.sense)
@@ -1122,7 +1158,7 @@ class Corpse:
     """A dead cell body. Releases nutrients into the field while it rots
     away; visually shrinks and disappears after DECOMPOSITION_TICKS."""
 
-    __slots__ = ("x", "y", "mass", "age", "dur")
+    __slots__ = ("x", "y", "mass", "age", "dur", "frozen")
 
     def __init__(self, x, y, mass, dur=DECOMPOSITION_TICKS):
         self.x = float(x)
@@ -1130,9 +1166,14 @@ class Corpse:
         self.mass = mass
         self.age = 0.0
         self.dur = dur
+        self.frozen = False  # True when below freeze temp, decomposition paused
 
-    def update(self, dt):
-        self.age += dt
+    def update(self, dt, temperature=TEMP_MUT_DEFAULT):
+        if temperature < TEMP_FREEZE:
+            self.frozen = True
+        else:
+            self.frozen = False
+            self.age += dt
 
     @property
     def done(self):
@@ -1142,5 +1183,10 @@ class Corpse:
         frac = 1.0 - min(1.0, self.age / self.dur)
         r = max(2, int((2 + self.mass * 1.5) * (0.35 + 0.65 * frac)))
         x, y = int(dx), int(dy)
-        pygame.draw.circle(surf, (55, 55, 62), (x, y), r)
-        pygame.draw.circle(surf, (95, 97, 105), (x, y), r, 1)
+        if self.frozen:
+            # Замороженные трупы: синий оттенок (не разлагаются)
+            pygame.draw.circle(surf, (45, 55, 85), (x, y), r)
+            pygame.draw.circle(surf, (80, 95, 130), (x, y), r, 1)
+        else:
+            pygame.draw.circle(surf, (55, 55, 62), (x, y), r)
+            pygame.draw.circle(surf, (95, 97, 105), (x, y), r, 1)

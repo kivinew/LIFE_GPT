@@ -1,0 +1,18 @@
+{
+  "id": "P3",
+  "title": "Remove unused import constants from main.py",
+  "priority": "P0",
+  "details": "PHOT_MIN_REQUIRED, ZOOP_MIN_REQUIRED, POLY_MIN_REQUIRED are imported in main.py but never used. Either implement extinction prevention or remove the dead imports.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T20:00:19.049653",
+  "done_at": "2026-08-09T20:02:41.280127",
+  "notes": "No changes needed: unused MIN_REQUIRED imports already removed from main.py in commit c687c65. Verified via grep (zero matches in main.py) and by reading import block (lines 15-104). Config.py definitions kept as legitimate configuration constants with documentation comments.",
+  "files": [
+    "main.py",
+    "config.py"
+  ],
+  "lines": [
+    "PHOT_MIN_REQUIRED, ZOOP_MIN_REQUIRED, POLY_MIN_REQUIRED"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "P10",
+  "title": "Replace biome dict with numpy array",
+  "priority": "P1",
+  "details": "\u0417\u0430\u043c\u0435\u043d\u0438\u0442\u044c biome (x,y) dict \u043d\u0430 2D numpy uint8 \u043c\u0430\u0441\u0441\u0438\u0432 \u0438\u043d\u0434\u0435\u043a\u0441\u043e\u0432 \u0431\u0438\u043e\u043c\u043e\u0432 \u0432 field.py. \u0423\u0441\u043a\u043e\u0440\u0438\u0442 \u0434\u043e\u0441\u0442\u0443\u043f \u043a \u0431\u0438\u043e\u043c\u0430\u043c \u0438 \u0443\u043c\u0435\u043d\u044c\u0448\u0438\u0442 \u043f\u0430\u043c\u044f\u0442\u044c.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T22:48:05.424899",
+  "done_at": "2026-08-09T22:57:34.292026",
+  "notes": "Replaced biome (x,y) dict with 2D numpy uint8 array in field.py. Changes: (1) __init__ - self.biomes = np.zeros((w,h), dtype=np.uint8) + self._biome_names list; (2) _assign_biomes - vectorized via np.random.choice instead of nested Python loop; (3) get_biome - array indexing self.biomes[xi,yi] with bounds check, returns self._biome_names[idx] (was dict.get); (4) analyze_biome_distribution - np.unique for counting (was O(n) iteration over dict values). All tests passed."
+}

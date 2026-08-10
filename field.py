@@ -32,9 +32,10 @@ class ResourceField:
         self.temperature: float = 0.7  # Global temperature (0.0-1.0)
         self.zoophagy_mult: float = 1.0  # Predator feeding efficiency multiplier
 
-        # Initialize biomes
-        self.biomes = {}
+        # Биомы: 2D uint8 массив индексов + список имён для быстрого доступа
         self.biome_registry = self._init_biome_registry()
+        self._biome_names = list(self.biome_registry.keys())
+        self.biomes = np.zeros((w, h), dtype=np.uint8)  # Индексы биомов по (x, y)
         self.current_biome_index = 0
 
         # 2D field of energy values [0.0 .. 1.0]
@@ -43,6 +44,7 @@ class ResourceField:
         # Hotspots and nutrient clusters
         self.hotspots = []
         self.nutrient_clusters = []
+        self._cluster_cache = {}  # id(cluster) -> (rgbs, cached_amount, gy_a, gx_a)
 
         # Scatter initial energy seeds — dense enough for cells to find food
         for _ in range(3000):
@@ -100,25 +102,17 @@ class ResourceField:
 
     def _assign_biomes(self):
         """Assign biome types to all grid cells based on biome probabilities."""
-        biomes = self.biomes
-        biome_names = list(self.biome_registry.keys())
-        biome_weights = [
-            0.25,
-            0.15,
-            0.20,
-            0.15,
-            0.25,
-        ]  # forest, desert, ocean, mountains, swamp
-
-        for x in range(self.w):
-            for y in range(self.h):
-                # Choose biome based on weighted random
-                biome_type = random.choices(biome_names, weights=biome_weights)[0]
-                biomes[(x, y)] = biome_type
+        biome_weights = [0.25, 0.15, 0.20, 0.15, 0.25]
+        # Векторизованное назначение биомов через numpy
+        choices = np.random.choice(len(self._biome_names), size=(self.w, self.h), p=biome_weights)
+        self.biomes = choices.astype(np.uint8)
 
     def get_biome(self, x, y):
         """Get biome type at coordinates."""
-        return self.biomes.get((x, y), "foresta")  # Default to forest
+        xi, yi = int(x), int(y)
+        if 0 <= xi < self.w and 0 <= yi < self.h:
+            return self._biome_names[self.biomes[xi, yi]]
+        return "foresta"  # Default to forest
 
     def get_biome_multiplier(self, x, y, multiplier_type="regen_mult"):
         """Get biome-specific multiplier for a given cell."""
@@ -135,71 +129,10 @@ class ResourceField:
 
     def analyze_biome_distribution(self):
         """Analyze and return statistics about biome distribution."""
-        distribution = {}
-        for biome_name in self.biome_registry.keys():
-            count = sum(1 for b in self.biomes.values() if b == biome_name)
-            distribution[biome_name] = count
+        distribution = {name: 0 for name in self._biome_names}
+        for biome_idx, count in zip(*np.unique(self.biomes, return_counts=True)):
+            distribution[self._biome_names[int(biome_idx)]] = int(count)
         return distribution
-
-    def adjust_biomes_for_season(self, season):
-        """Adjust biome characteristics based on current season.
-
-        This method is called from cell.py when seasons change, allowing biomes
-        to adapt their characteristics to seasonal changes.
-        """
-        if season == "spring":
-            # Spring: Increased resources, moderate temperature
-            for pos, biome_name in self.biomes.items():
-                if biome_name == "foresta":
-                    # Forest benefits from spring growth
-                    self.data[pos[0], pos[1]] = min(
-                        1.0, self.data[pos[0], pos[1]] + 0.02
-                    )
-                elif biome_name == "swamp":
-                    # Swamp shows strong spring growth
-                    self.data[pos[0], pos[1]] = min(
-                        1.0, self.data[pos[0], pos[1]] + 0.03
-                    )
-
-        elif season == "summer":
-            # Summer: Heat stress, potential resource depletion
-            for pos, biome_name in self.biomes.items():
-                if biome_name == "deserto":
-                    # Desert suffers from summer heat
-                    self.data[pos[0], pos[1]] = max(
-                        0.0, self.data[pos[0], pos[1]] - 0.01
-                    )
-                elif biome_name == "ocean":
-                    # Ocean remains stable
-                    pass
-
-        elif season == "autumn":
-            # Autumn: Resource cycling, preparation for winter
-            for pos, biome_name in self.biomes.items():
-                if biome_name == "mountains":
-                    # Mountains show autumn resource decline
-                    self.data[pos[0], pos[1]] = max(
-                        0.0, self.data[pos[0], pos[1]] - 0.01
-                    )
-                elif biome_name == "foresta":
-                    # Forest shows autumn resource dynamics
-                    self.data[pos[0], pos[1]] = min(
-                        1.0, self.data[pos[0], pos[1]] + 0.015
-                    )
-
-        elif season == "winter":
-            # Winter: Cold stress, reduced regeneration
-            for pos, biome_name in self.biomes.items():
-                if biome_name == "ocean":
-                    # Ocean maintains resources well in winter
-                    self.data[pos[0], pos[1]] = min(
-                        1.0, self.data[pos[0], pos[1]] + 0.01
-                    )
-                elif biome_name == "swamp":
-                    # Swamp faces winter challenges
-                    self.data[pos[0], pos[1]] = max(
-                        0.0, self.data[pos[0], pos[1]] - 0.01
-                    )
 
     def add_nutrient_cluster(self, x, y, amount, cell_color=None) -> None:
         x, y = int(x), int(y)
@@ -386,33 +319,51 @@ class ResourceField:
         buf[:, :, 1] = (g * gc).astype(np.uint8)
         buf[:, :, 2] = (g * bc).astype(np.uint8)
 
-        del buf  # unlock _fsurf before creating PixelArray
+        # Clean up stale cluster cache entries (clusters that were removed)
+        if self._cluster_cache:
+            current_ids = {id(c) for c in self.nutrient_clusters}
+            for k in list(self._cluster_cache.keys()):
+                if k not in current_ids:
+                    del self._cluster_cache[k]
 
         # Highlight nutrient clusters — organic shape, colored by dead cell
+        # Cached: only recompute RGB when amount changes >10%
         for cluster in self.nutrient_clusters:
             cx, cy, amount, cluster_mask, falloff, cluster_max_r = cluster[0], cluster[1], cluster[2], cluster[3], cluster[4], cluster[5]
             cell_color = cluster[6] if len(cluster) > 6 else None
             if amount > CORPSE_NUTRIENT_MIN_AMOUNT and cell_color is not None:
-                # Recolor food pixels within the organic mask to the dead cell's color
-                my_y, mx_x = np.where(cluster_mask)
-                gy = np.clip(cx - cluster_max_r + mx_x, 0, w - 1)
-                gx = np.clip(cy - cluster_max_r + my_y, 0, h - 1)
-                intensities = d[gy, gx]
-                active = intensities > 0.01
-                if np.any(active):
-                    cr = cell_color[0]
-                    cg = cell_color[1]
-                    cb = cell_color[2]
-                    g_ = (intensities[active] * 255).astype(np.uint8)
-                    # Use PixelArray for batch pixel writes
-                    pa = pygame.PixelArray(self._fsurf)
-                    for i in range(len(gy[active])):
-                        pa[int(gy[active][i]), int(gx[active][i])] = (
-                            int(g_[i]) * cr // 255,
-                            int(g_[i]) * cg // 255,
-                            int(g_[i]) * cb // 255,
-                        )
-                    del pa
+                cache_key = id(cluster)
+                cached = self._cluster_cache.get(cache_key)
+
+                if cached is not None and abs(cached[1] - amount) / max(amount, 0.01) <= 0.10:
+                    # Cache valid — apply cached RGB directly to buf
+                    rgbs, _, gy_cached, gx_cached = cached
+                    buf[gy_cached, gx_cached, 0] = rgbs[:, 0]
+                    buf[gy_cached, gx_cached, 1] = rgbs[:, 1]
+                    buf[gy_cached, gx_cached, 2] = rgbs[:, 2]
+                else:
+                    # Cache miss — recompute RGB from food field, then cache
+                    my_y, mx_x = np.where(cluster_mask)
+                    gy = np.clip(cx - cluster_max_r + mx_x, 0, w - 1)
+                    gx = np.clip(cy - cluster_max_r + my_y, 0, h - 1)
+                    intensities = d[gy, gx]
+                    active = intensities > 0.01
+                    if np.any(active):
+                        cr, cg, cb = cell_color
+                        g_ = (intensities[active] * 255).astype(np.uint8)
+                        rgbs = np.stack([
+                            (g_ * cr // 255).astype(np.uint8),
+                            (g_ * cg // 255).astype(np.uint8),
+                            (g_ * cb // 255).astype(np.uint8),
+                        ], axis=1)
+                        gy_a = gy[active]
+                        gx_a = gx[active]
+                        buf[gy_a, gx_a, 0] = rgbs[:, 0]
+                        buf[gy_a, gx_a, 1] = rgbs[:, 1]
+                        buf[gy_a, gx_a, 2] = rgbs[:, 2]
+                        self._cluster_cache[cache_key] = (rgbs, amount, gy_a, gx_a)
+
+        del buf  # unlock _fsurf before set_at
 
         # Highlight hotspots
         for hx, hy, hv in self.hotspots:

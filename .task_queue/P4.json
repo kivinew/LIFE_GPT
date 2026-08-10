@@ -1,0 +1,17 @@
+{
+  "id": "P4",
+  "title": "Add FPS counter to stats display in main.py",
+  "priority": "P0",
+  "details": "Draw current FPS in the bottom-right corner stats panel. dev_plan.md testing methodology references an FPS counter in Tab stats, but none exists. Add it to the stats text rendering.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T20:02:47.812177",
+  "done_at": "2026-08-09T20:06:45.690882",
+  "notes": "No changes needed: FPS counter already implemented at main.py:1414-1417 (commit 5a87b76, 2026-08-03). Renders 'FPS: {clock.get_fps():.0f}' at bottom-right corner (W - width - 10, H - 24) using font (line 379) and clock (line 377). Task was created from stale dev_plan.md that predated the implementation. Verified via syntax check, import check, and 5s headless sim run with no errors.",
+  "files": [
+    "main.py"
+  ],
+  "lines": [
+    "stats rendering section"
+  ]
+}

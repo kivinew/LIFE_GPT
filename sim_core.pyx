@@ -10,6 +10,8 @@
 import numpy as np
 cimport numpy as np
 cimport cython
+from libc.stdlib cimport rand, RAND_MAX
+from libc.math cimport cos as c_cos, sin as c_sin, sqrt as c_sqrt
 
 # ── Constants (duplicated from config.py for Cython compile-time) ──
 # IMPORTANT: keep these in sync with config.py — edits to balance values in
@@ -39,10 +41,13 @@ cdef double _COMBAT_DAMAGE_GAIN = 0.8          # config: COMBAT_DAMAGE_GAIN
 cdef double _MASS_DMG_EFFICIENCY = 0.035        # config: MASS_DMG_EFFICIENCY
 cdef double _MIN_MASS_DMG_EFF = 0.45           # config: MIN_MASS_DMG_EFF
 
-cdef int _CELL_SIZE = 48
+cdef int _CELL_SIZE = 16
 cdef int _SB = 600
 cdef int _W = 1600
 cdef int _H = 900
+
+# ── Math constants (not in config.py, used only by Cython hot loops) ──
+cdef double _PI2 = 6.28318530717958647692  # 2 * pi
 
 
 @cython.boundscheck(False)
@@ -163,3 +168,88 @@ def build_spatial_grid(
         else:
             grid[key] = [i]
     return grid
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_neighbors(dict grid, double x, double y, int radius):
+    """Return indices of cells in neighboring grid cells (Cython version).
+
+    Mirrors spatial.py's get_neighbors() — operates on a Python dict grid
+    built by build_spatial_grid(). Faster than the Python loop because
+    variables are typed and grid.get() replaces 'in' + indexing.
+    """
+    cdef int gx = <int>(x / _CELL_SIZE)
+    cdef int gy = <int>(y / _CELL_SIZE)
+    cdef list result = []
+    cdef int dx, dy
+    cdef tuple key
+    cdef list bucket
+
+    for dx in range(-radius, radius + 1):
+        for dy in range(-radius, radius + 1):
+            key = (gx + dx, gy + dy)
+            bucket = grid.get(key)
+            if bucket is not None:
+                result.extend(bucket)
+    return tuple(result)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def cy_sense_food(
+    np.ndarray[np.float64_t, ndim=1] xs,
+    np.ndarray[np.float64_t, ndim=1] ys,
+    np.ndarray[np.int32_t, ndim=1] diet_arr,
+    np.ndarray[np.float64_t, ndim=1] sense_arr,
+    np.ndarray[np.float64_t, ndim=1] best_dx,
+    np.ndarray[np.float64_t, ndim=1] best_dy,
+    np.ndarray[np.float64_t, ndim=2] field_data,
+    int n, int fw, int fh,
+):
+    """Bulk food ray sampling for all cells.
+
+    Replaces the per-cell trigonometric ray sampling in sensory_phase:
+    - Sets a random initial direction for every cell.
+    - For PHOT/POLY cells, samples 16 rays in the food field and picks
+      the direction with the highest food score.
+
+    Updates *best_dx* / *best_dy* in-place.  Uses C libc math
+    (c_cos, c_sin, c_sqrt) and rand() for speed.
+    """
+    cdef int i, j, sx, sy
+    cdef double ang, dist, val, score, best_score
+    cdef double _bx, _by, _bn, sense
+    cdef double r_max = <double>RAND_MAX
+
+    for i in range(n):
+        # Random initial direction (for all cells)
+        _bx = <double>rand() / r_max * 2.0 - 1.0
+        _by = <double>rand() / r_max * 2.0 - 1.0
+        _bn = c_sqrt(_bx * _bx + _by * _by)
+        if _bn > 0.0:
+            best_dx[i] = _bx / _bn
+            best_dy[i] = _by / _bn
+        else:
+            best_dx[i] = 0.0
+            best_dy[i] = 1.0
+
+        # Food ray sampling for PHOT/POLY cells only
+        if diet_arr[i] == _PHOT or diet_arr[i] == _POLY:
+            if sense_arr[i] < 8.0:
+                sense = 8.0
+            else:
+                sense = sense_arr[i]
+            best_score = -1.0
+            for j in range(16):
+                ang = <double>rand() / r_max * _PI2
+                dist = <double>rand() / r_max * sense
+                sx = <int>(xs[i] + c_cos(ang) * dist)
+                sy = <int>(ys[i] + c_sin(ang) * dist)
+                if 0 <= sx < fw and 0 <= sy < fh:
+                    val = field_data[sx, sy]
+                    score = val / (1.0 + dist / sense)
+                    if score > best_score:
+                        best_score = score
+                        best_dx[i] = c_cos(ang)
+                        best_dy[i] = c_sin(ang)

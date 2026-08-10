@@ -1,0 +1,17 @@
+{
+  "id": "P1-3",
+  "title": "Cache population graph surface; only re-render on new data",
+  "priority": "P1",
+  "details": "PopulationGraph in ui.py redraws the entire canvas every frame even when data hasn't changed. Cache the rendered surface and only rebuild when new samples arrive.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T20:30:59.233726",
+  "done_at": "2026-08-09T20:42:48.108770",
+  "notes": "Caching PopulationGraph.draw(): added _cached_surf/_cache_key/_cache_version. Cache key = (version, width, height). Version increments on update()/new cls (_ensure_cls)/toggle_cls/toggle_diet/toggle_total. draw() renders to local graph_surf (width+30 for Y labels) with offset coords, caches and blits. 6 cache behavior tests + 8s sim smoke test all passed.",
+  "files": [
+    "ui.py"
+  ],
+  "lines": [
+    "PopulationGraph.draw()"
+  ]
+}

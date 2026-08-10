@@ -1,0 +1,11 @@
+{
+  "id": "P18",
+  "title": "Rebalance ZOOP starting energy",
+  "priority": "P1",
+  "details": "ZOOP starting energy (35.0) \u043d\u0438\u0436\u0435 \u0447\u0435\u043c PHOT (45.0), \u0434\u0435\u043b\u0430\u044f ZOOP \u0441\u043b\u043e\u0436\u043d\u0435\u0435. \u0412\u044b\u0440\u043e\u0432\u043d\u044f\u0442\u044c \u0438\u043b\u0438 \u043e\u0442\u0431\u0430\u043b\u0430\u043d\u0441\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0432 config.py.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T23:06:47.885535",
+  "done_at": "2026-08-09T23:08:57.208288",
+  "notes": "Raised ZOO_INITIAL_ENERGY from 35.0 to 50.0 in config.py (was 65.0 originally, reduced to 35.0 which made ZOOP too weak vs PHOT=45.0). ZOOP predators now start with enough energy (50.0) to hunt before starving, given their 0.55x metabolism multiplier. No Cython rebuild needed (constant is Python-only in cell.py, not in sim_core.pyx). All tests passed."
+}

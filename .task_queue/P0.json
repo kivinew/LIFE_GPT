@@ -1,0 +1,17 @@
+{
+  "id": "P0",
+  "title": "Remove dead speciation code from cell.py divide method",
+  "priority": "P0",
+  "details": "The speciation block in cell.py divide() references self.field and self._world which are never set. This code is dead and broken. Remove it to eliminate confusion and potential FutureErrors.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T19:42:31.327089",
+  "done_at": "2026-08-09T19:47:25.188817",
+  "notes": "No source changes needed \u2014 dead speciation block was already removed in commit 18fef01 (2026-08-02). Verified cell.py divide() (lines 942-996) contains no references to self.field/self._world; refresh_class() in __init__ (line 159) correctly handles child cls/color. Syntax and import checks pass.",
+  "files": [
+    "cell.py"
+  ],
+  "lines": [
+    "divide() method"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "P1",
+  "title": "Remove unused _interact_with alias from cell.py",
+  "priority": "P0",
+  "details": "_interact_with = interact_with at line 759 is never referenced anywhere. Remove it. Also verify no other dead aliases exist in cell.py.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T19:47:30.847824",
+  "done_at": "2026-08-09T19:49:17.570889",
+  "notes": "No source changes needed \u2014 _interact_with alias was already removed in commit 5a87b76 (2026-08-03). Verified no other dead aliases exist in cell.py via AST analysis (35 assignments checked, all local vars or used module-level names).",
+  "files": [
+    "cell.py"
+  ],
+  "lines": [
+    759
+  ]
+}

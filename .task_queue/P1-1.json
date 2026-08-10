@@ -1,0 +1,17 @@
+{
+  "id": "P1-1",
+  "title": "Implement cell surface caching (biggest FPS win)",
+  "priority": "P1",
+  "details": "Cache cell surfaces per (cls, radius) pair in cell.py. Invalidate cache on refresh_class(). draw_at() currently creates a new SRCALPHA Surface + concentric gradient circles per cell per frame. This is the single largest rendering cost.",
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-09T20:07:00.845578",
+  "done_at": "2026-08-09T20:18:08.593453",
+  "notes": "Implemented cell surface caching in cell.py. Added module-level _cell_surface_cache dict + _get_cached_cell_surface() helper (lines 138-170) that caches gradient surfaces per (cls, radius, energy_band, selected). Modified Cell.draw_at() (line 1071) to use cached surface instead of allocating new SRCALPHA Surface + drawing r concentric circles every frame. Energy quantized to 5 bands for visual fidelity; cache capped at 2000 entries. All tests passed: syntax, import, 6 targeted cache tests, 6s headless sim run.",
+  "files": [
+    "cell.py"
+  ],
+  "lines": [
+    "draw_at() method"
+  ]
+}
