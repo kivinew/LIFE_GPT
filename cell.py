@@ -3,6 +3,7 @@
 import math
 import random
 import pygame
+import numpy as np
 from typing import Optional, List, Dict
 
 divisions = 0
@@ -893,7 +894,7 @@ class Cell:
         self.age += 1
         if tick % 500 == 0:
             self.memory_decay_tick()
-        self.sensory_phase(field, cells, grid)
+        self.sensory_phase(field, cells, grid, dt)
         self.reaction_phase()
         pack_decision = self.pack_phase(cells, grid)
         self.move_phase(dt, field.temperature)
@@ -1190,3 +1191,124 @@ class Corpse:
         else:
             pygame.draw.circle(surf, (55, 55, 62), (x, y), r)
             pygame.draw.circle(surf, (95, 97, 105), (x, y), r, 1)
+
+
+# ── Vectorized neighbor calculation (NumPy fallback) ────────────────────────
+def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False):
+    """Batch-process sensory_phase for all cells using NumPy.
+
+    Replaces the per-cell Python loop with vectorized array operations
+    for neighbor-based sensory logic (PHOT flee, ZOOP/POLY prey hunting).
+    Food ray sampling is also batched when skip_food_ray=False.
+    """
+    n = len(cells)
+    if n == 0:
+        return
+
+    xs = np.array([c.x for c in cells], dtype=np.float64)
+    ys = np.array([c.y for c in cells], dtype=np.float64)
+    diets = np.array([c.genome.diet for c in cells], dtype=np.int32)
+    senses = np.array([max(8.0, c.genome.sense) for c in cells], dtype=np.float64)
+    energies = np.array([c.energy for c in cells], dtype=np.float64)
+    cls_ids = np.array([c.cls for c in cells], dtype=np.int64)
+    bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
+    bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
+    cautious = np.array([c.genome.cautious for c in cells], dtype=np.float64)
+
+    field_w = W - SB
+
+    # Food ray sampling (batched per cell, vectorized distance scoring)
+    if not skip_food_ray:
+        for i in range(n):
+            d = diets[i]
+            if d in (PHOT, POLY):
+                sense = senses[i]
+                cx, cy = xs[i], ys[i]
+                best_score = -1.0
+                best_ang_x, best_ang_y = bdx[i], bdy[i]
+                for _ray in range(16):
+                    ang = random.random() * math.tau
+                    dist = random.random() * sense
+                    sx = int(cx + math.cos(ang) * dist)
+                    sy = int(cy + math.sin(ang) * dist)
+                    if 0 <= sx < field_w and 0 <= sy < H:
+                        val = field.data[sx][sy]
+                        score = val / (1.0 + dist / sense)
+                        if score > best_score:
+                            best_score = score
+                            best_ang_x = math.cos(ang)
+                            best_ang_y = math.sin(ang)
+                bdx[i] = best_ang_x
+                bdy[i] = best_ang_y
+
+    # Neighbor-based sensory logic (PHOT flee, ZOOP/POLY prey hunt)
+    for i in range(n):
+        d = diets[i]
+        cx, cy = xs[i], ys[i]
+        sense = senses[i]
+        sense_sq = sense * sense
+
+        neighbors = get_neighbors(grid, cx, cy, radius=2)
+        neighbors = [j for j in neighbors if j != i]
+        if len(neighbors) == 0:
+            continue
+
+        # Vectorized distance calc to all neighbors
+        nx = np.array([xs[j] for j in neighbors], dtype=np.float64)
+        ny = np.array([ys[j] for j in neighbors], dtype=np.float64)
+        dx_arr = nx - cx
+        dy_arr = ny - cy
+        dist_sq = dx_arr * dx_arr + dy_arr * dy_arr
+
+        # PHOT: flee from non-same-class non-ZOOP cells
+        if d == PHOT and random.random() < 0.35:
+            threat_mask = np.zeros(len(neighbors), dtype=bool)
+            for k, j in enumerate(neighbors):
+                if (energies[j] > 0 and cls_ids[j] != cls_ids[i] and diets[j] != ZOOP
+                        and dist_sq[k] > 0 and dist_sq[k] <= min(sense, 50.0) ** 2):
+                    threat_mask[k] = True
+            threat_idx = np.where(threat_mask)[0]
+            if len(threat_idx) > 0:
+                k = threat_idx[0]
+                angle = math.atan2(-dy_arr[k], -dx_arr[k]) + random.uniform(-0.5, 0.5)
+                bdx[i] = math.cos(angle)
+                bdy[i] = math.sin(angle)
+
+        # ZOOP/POLY: hunt prey
+        if d in (ZOOP, POLY):
+            prey_mask = np.zeros(len(neighbors), dtype=bool)
+            prey_scores = np.full(len(neighbors), -1.0)
+            for k, j in enumerate(neighbors):
+                if energies[j] > 0 and cls_ids[j] != cls_ids[i]:
+                    if dist_sq[k] > 0 and dist_sq[k] <= sense_sq:
+                        prey_mask[k] = True
+                        if d == ZOOP:
+                            mem_bias = 1.0 - cells[j].memory.coop(cls_ids[i]) * 0.3 if hasattr(cells[j], 'memory') else 1.0
+                            prey_scores[k] = energies[j] * mem_bias
+                        else:
+                            val = min(1.0, energies[j] / 100.0)
+                            prey_scores[k] = val / (1.0 + math.sqrt(dist_sq[k]) / sense)
+            prey_idx = np.where(prey_mask)[0]
+            if len(prey_idx) > 0:
+                if d == ZOOP:
+                    k = prey_idx[np.argmin(prey_scores[prey_idx])]
+                else:
+                    k = prey_idx[np.argmax(prey_scores[prey_idx])]
+                dist = math.sqrt(dist_sq[k])
+                if dist > 0:
+                    bdx[i] = dx_arr[k] / dist
+                    bdy[i] = dy_arr[k] / dist
+
+        # ZOOP cautious flee when low energy
+        if d == ZOOP and energies[i] < 12.0:
+            if random.random() < cautious[i]:
+                rand_x = random.uniform(-1, 1)
+                rand_y = random.uniform(-1, 1)
+                norm = math.hypot(rand_x, rand_y)
+                if norm > 0:
+                    bdx[i] = rand_x / norm
+                    bdy[i] = rand_y / norm
+
+    # Write back best_dir
+    for i, c in enumerate(cells):
+        c.best_dir = (float(bdx[i]), float(bdy[i]))

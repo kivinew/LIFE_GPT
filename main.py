@@ -666,11 +666,12 @@ def main():
         real_dt_ms = clock.tick(60)
         real_dt_s = real_dt_ms / 1000.0 * sl_time.val
         sim_accumulator += real_dt_s
-        
+
         # Limit to prevent spiral of death
-        if sim_accumulator > MAX_FRAME_SKIP * FIXED_DT:
-            sim_accumulator = MAX_FRAME_SKIP * FIXED_DT
-        
+        max_skip = MAX_SUBSTEPS * FIXED_DT
+        if sim_accumulator > max_skip:
+            sim_accumulator = max_skip
+
         # Season calculation uses tick (unchanged)
         season_idx = (tick // SEASON_LENGTH) % 4
         season_name = SEASON_ORDER[season_idx]
@@ -956,126 +957,89 @@ def main():
                 food_decay_rate = 1.0 / max(1.0, sl_food_lifetime.val)
                 field.step(FIXED_DT, len(cells), decay_rate=food_decay_rate, nutrient_fade=1.0 - 50.0 / sl_food_areola_lifetime.val)
 
-            # Simulation
-            grid_wrapper.refresh()
-            if _HAVE_SIM_CORE:
-                # Bulk food ray sampling (Cython-accelerated sensory_phase)
-                if _HAVE_CY_FOOD_SENSE and cells:
-                    _n = len(cells)
-                    _xs = np.array([c.x for c in cells], dtype=np.float64)
-                    _ys = np.array([c.y for c in cells], dtype=np.float64)
-                    _di = np.array([c.genome.diet for c in cells], dtype=np.int32)
-                    _sense = np.array(
-                        [max(8.0, c.genome.sense) for c in cells], dtype=np.float64
-                    )
-                    _bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
-                    _bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
-                    cy_sense_food(_xs, _ys, _di, _sense, _bdx, _bdy,
-                                  field.data, _n, W - SB, H)
-                    for i, c in enumerate(cells):
-                        c.best_dir = (float(_bdx[i]), float(_bdy[i]))
+                # Simulation (inside fixed-step loop)
+                grid_wrapper.refresh()
+                if _HAVE_SIM_CORE:
+                    # Bulk food ray sampling (Cython-accelerated sensory_phase)
+                    if _HAVE_CY_FOOD_SENSE and cells:
+                        _n = len(cells)
+                        _xs = np.array([c.x for c in cells], dtype=np.float64)
+                        _ys = np.array([c.y for c in cells], dtype=np.float64)
+                        _di = np.array([c.genome.diet for c in cells], dtype=np.int32)
+                        _sense = np.array(
+                            [max(8.0, c.genome.sense) for c in cells], dtype=np.float64
+                        )
+                        _bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
+                        _bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
+                        cy_sense_food(_xs, _ys, _di, _sense, _bdx, _bdy,
+                                      field.data, _n, W - SB, H)
+                        for i, c in enumerate(cells):
+                            c.best_dir = (float(_bdx[i]), float(_bdy[i]))
 
-                # Per-cell sensory (neighbor-based logic; food rays done by cy_sense_food)
-                for c in cells:
-                    c.sensory_phase(field, cells, grid_wrapper.grid, FIXED_DT,
-                                    skip_food_ray=_HAVE_CY_FOOD_SENSE)
-                n = len(cells)
-                if n > 0:
-                    xs = np.array([c.x for c in cells], dtype=np.float64)
-                    ys = np.array([c.y for c in cells], dtype=np.float64)
-                    de = np.array([c.energy for c in cells], dtype=np.float64)
-                    di = np.array([c.genome.diet for c in cells], dtype=np.int32)
-                    sp = np.array([c.genome.speed for c in cells], dtype=np.float64)
-                    ma = np.array([c.genome.mass for c in cells], dtype=np.float64)
-                    me = np.array(
-                        [c.genome.metabolism for c in cells], dtype=np.float64
-                    )
-                    le = np.array([c.level for c in cells], dtype=np.int32)
-                    ag = np.array([c.aggression for c in cells], dtype=np.float64)
-                    bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
-                    bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
-                    rt = np.array(
-                        [
-                            (
-                                1
-                                if c.reaction_type == "flee"
-                                else (2 if c.reaction_type == "attack" else 0)
-                            )
-                            for c in cells
-                        ],
-                        dtype=np.int8,
-                    )
-                    rtm = np.array([c.reaction_timer for c in cells], dtype=np.int32)
-                    rta = np.array(
-                        [
-                            (
-                                next(
-                                    (
-                                        j
-                                        for j, oc in enumerate(cells)
-                                        if oc is c.reaction_target
-                                    ),
-                                    -1,
-                                )
-                                if c.reaction_target
-                                else -1
-                            )
-                            for c in cells
-                        ],
-                        dtype=np.int32,
-                    )
-                    td = np.zeros(n, dtype=np.int8)
-                    fd = field.data.copy()
+                    # Per-cell sensory (neighbor-based logic; food rays done by cy_sense_food)
+                    if _HAVE_CY_FOOD_SENSE:
+                        # Use vectorized NumPy neighbor calculations
+                        from cell import vectorized_sensory_phase
+                        vectorized_sensory_phase(cells, grid_wrapper.grid, field, FIXED_DT, skip_food_ray=True)
+                    else:
+                        for c in cells:
+                            c.sensory_phase(field, cells, grid_wrapper.grid, FIXED_DT, skip_food_ray=False)
+                    n = len(cells)
+                    if n > 0:
+                        xs = np.array([c.x for c in cells], dtype=np.float64)
+                        ys = np.array([c.y for c in cells], dtype=np.float64)
+                        de = np.array([c.energy for c in cells], dtype=np.float64)
+                        di = np.array([c.genome.diet for c in cells], dtype=np.int32)
+                        sp = np.array([c.genome.speed for c in cells], dtype=np.float64)
+                        ma = np.array([c.genome.mass for c in cells], dtype=np.float64)
+                        me = np.array(
+                            [c.genome.metabolism for c in cells], dtype=np.float64
+                        )
+                        le = np.array([c.level for c in cells], dtype=np.int32)
+                        bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
+                        bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
+                        td = np.zeros(n, dtype=np.int8)
+                        fd = field.data.copy()
 
-                    apply_physics(xs, ys, bdx, bdy, sp, FIXED_DT)
-                    apply_metabolism_and_feeding(xs, ys, de, di, sp, ma, me, le, fd, FIXED_DT)
-                    field.data[:] = fd
+                        apply_physics(xs, ys, bdx, bdy, sp, FIXED_DT)
+                        apply_metabolism_and_feeding(xs, ys, de, di, sp, ma, me, le, fd, FIXED_DT)
+                        field.data[:] = fd
 
-                    for i, c in enumerate(cells):
-                        c.x = float(xs[i])
-                        c.y = float(ys[i])
-                        c.energy = float(de[i])
-                        c.genome.mass = float(ma[i])
-                        c.level = int(le[i])
+                        for i, c in enumerate(cells):
+                            c.x = float(xs[i])
+                            c.y = float(ys[i])
+                            c.energy = float(de[i])
+                            c.genome.mass = float(ma[i])
+                            c.level = int(le[i])
 
+                        for c in cells:
+                            if c.energy > 0:
+                                c.post_step(field, cells, grid_wrapper.grid, td, FIXED_DT, 0)
+                else:
                     for c in cells:
                         if c.energy > 0:
-                            c.post_step(field, cells, grid_wrapper.grid, td, FIXED_DT, 0)
-            else:
-                for c in cells:
-                    if c.energy > 0:
-                        c.step(field, cells, grid_wrapper.grid, FIXED_DT, 0)
+                            c.step(field, cells, grid_wrapper.grid, FIXED_DT, 0)
 
-            # ── Corpse feeding, death & decomposition ────────────────
-            eat_corpses(cells, corpses, FIXED_DT)
-            process_deaths(cells, field, corpses)
-            for cp in corpses[:]:
-                cp.update(FIXED_DT, temperature=field.temperature)
-                if cp.done:
-                    corpses.remove(cp)
+                # Corpse feeding, death & decomposition
+                eat_corpses(cells, corpses, FIXED_DT)
+                process_deaths(cells, field, corpses)
+                for cp in corpses[:]:
+                    cp.update(FIXED_DT, temperature=field.temperature)
+                    if cp.done:
+                        corpses.remove(cp)
 
-            # ── Camera follows the selected cell ─────────────────────
-            if follow_mode and sel_cell is not None:
-                if sel_cell in cells:
-                    # Smooth camera following with interpolation for fluid motion
-                    # Target position is the selected cell
-                    target_cam_x, target_cam_y = sel_cell.x, sel_cell.y
-
-                    # Calculate current camera position relative to world coordinates
-                    # Current camera position is already in world coordinates (cam_x, cam_y)
-                    # Calculate smooth interpolation factor (0.1 for smooth follow)
-                    follow_speed = 0.15
-
-                    # Interpolate camera position toward target
-                    new_cam_x = cam_x + (target_cam_x - cam_x) * follow_speed
-                    new_cam_y = cam_y + (target_cam_y - cam_y) * follow_speed
-
-                    # Update camera position
-                    cam_x, cam_y = new_cam_x, new_cam_y
-                    st.cam_x, st.cam_y = cam_x, cam_y
-                else:
-                    follow_mode = False
-                    st.follow_mode = False
+                # Camera follows the selected cell
+                if follow_mode and sel_cell is not None:
+                    if sel_cell in cells:
+                        target_cam_x, target_cam_y = sel_cell.x, sel_cell.y
+                        follow_speed = 0.15
+                        new_cam_x = cam_x + (target_cam_x - cam_x) * follow_speed
+                        new_cam_y = cam_y + (target_cam_y - cam_y) * follow_speed
+                        cam_x, cam_y = new_cam_x, new_cam_y
+                        st.cam_x, st.cam_y = cam_x, cam_y
+                    else:
+                        follow_mode = False
+                        st.follow_mode = False
 
             # ── Time-lapse recording (DEV_PLAN Phase 3.1) ─────────────────────────────────
             if time_lapse_active:

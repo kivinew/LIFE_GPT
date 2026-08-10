@@ -152,10 +152,10 @@ FOOD_HOTSPOT_BOOST = 0.05     # extra energy added at hotspot center per regen
 
 # ── Nutrient clusters (from dead cells) ─────────────────────────────────────
 CORPSE_NUTRIENT_FIELD_RATE = (
-    0.06  # cluster amount fed into the field per tick (was 0.03)
+    0.06  # cluster amount fed into the field per tick
 )
 CORPSE_NUTRIENT_FADE = (
-    0.975  # per-tick fade of cluster amount — 30% shorter lifespan
+    0.96  # per-tick fade — faster decay for fewer active clusters
 )
 CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
 CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)
@@ -190,10 +190,10 @@ CORPSE_EAT_EFFICIENCY = 0.8  # energy gained per unit of corpse mass consumed
 CORPSE_ATTRACT_RADIUS = 80.0  # ZOOP scavenging radius (attracted to corpses)
 CORPSE_SCAVENGE_RATE = 0.008  # energy gained per tick for ZOOP scavenging
 CORPSE_NUTRIENT_FIELD_RATE = (
-    0.06  # cluster amount fed into the field per tick (was 0.03)
+    0.06  # cluster amount fed into the field per tick
 )
 CORPSE_NUTRIENT_FADE = (
-    0.975  # per-tick fade of cluster amount — 30% shorter lifespan
+    0.96  # per-tick fade — faster decay for fewer active clusters
 )
 CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
 CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)
