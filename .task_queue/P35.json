@@ -1,0 +1,11 @@
+{
+  "id": "P35",
+  "title": "Fix nutrient cluster double application",
+  "priority": "P3",
+  "details": "E1: In field.py:229-267, normalize FIELD_RATE coefficients so clusters apply once per tick.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

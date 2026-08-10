@@ -1,0 +1,11 @@
+{
+  "id": "P27",
+  "title": "Fix pack requiring different class",
+  "priority": "P1",
+  "details": "B4: In cell.py:527, change other.cls != my_cls to other.genome.diet == self.genome.diet for pack behavior.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

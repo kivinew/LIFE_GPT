@@ -1,0 +1,11 @@
+{
+  "id": "P38",
+  "title": "Sync aging_phase and is_death thresholds",
+  "priority": "P3",
+  "details": "E6: Align aging_phase death at 1.0x lifespan with is_dead check at 1.1x lifespan.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

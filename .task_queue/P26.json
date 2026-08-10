@@ -1,0 +1,11 @@
+{
+  "id": "P26",
+  "title": "Fix combat threat reduction inversion",
+  "priority": "P1",
+  "details": "B3: In cell.py:584-589, increase threat when taking damage, decrease when dealing damage.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

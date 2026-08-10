@@ -1,0 +1,11 @@
+{
+  "id": "P32",
+  "title": "Fix virus instant kill mechanic",
+  "priority": "P2",
+  "details": "D4: In cell.py:796-798, reduce lifespan damage from 15% per tick to 1% per tick or make it one-time.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

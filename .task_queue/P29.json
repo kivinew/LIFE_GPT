@@ -1,0 +1,11 @@
+{
+  "id": "P29",
+  "title": "Fix mass efficiency feeding imbalance",
+  "priority": "P1",
+  "details": "D1: In cell.py:480, limit mass_eff range to 0.5-2.0 so small cells don't feed 4x faster than large.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

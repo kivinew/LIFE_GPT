@@ -1,0 +1,11 @@
+{
+  "id": "P21",
+  "title": "Fix Cython double metabolism/feeding in post_step",
+  "priority": "P0",
+  "details": "A1: In cell.py post_step(), skip feed_phase() and metabolism_phase() when _HAVE_SIM_CORE=True to avoid double-applying in Cython mode.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

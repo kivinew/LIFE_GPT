@@ -1,0 +1,11 @@
+{
+  "id": "P33",
+  "title": "Make combat profitable for attacker",
+  "priority": "P2",
+  "details": "D2: Increase COMBAT_DAMAGE_GAIN or add energy bonus for kills to make predation viable.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

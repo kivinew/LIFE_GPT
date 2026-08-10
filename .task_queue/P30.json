@@ -1,0 +1,11 @@
+{
+  "id": "P30",
+  "title": "Fix pack boost dead code",
+  "priority": "P1",
+  "details": "D5: In cell.py:536-545, apply pack_boost as combat multiplier instead of flat 1.5.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

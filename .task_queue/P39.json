@@ -1,0 +1,11 @@
+{
+  "id": "P39",
+  "title": "Fix level-down threshold",
+  "priority": "P2",
+  "details": "D6: In config.py, lower LEVEL_DOWN_THRESHOLD from 3.0 to 1.5 or add energy gain on level-down.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

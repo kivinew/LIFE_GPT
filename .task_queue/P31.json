@@ -1,0 +1,11 @@
+{
+  "id": "P31",
+  "title": "Remove dead code and unused constants",
+  "priority": "P2",
+  "details": "C: Remove ZOO_WEAK_TARGET_THRESHOLD, FOOD_LIFETIME_TICKS, get_biome_temperature(), get_biome_multiplier(), analyze_biome_distribution(), duplicate SpatialGrid, duplicate CORPSE_NUTRIENT_* constants, self.aggression field.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

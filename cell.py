@@ -80,6 +80,7 @@ from config import (
     DIVIDE_ENERGY_RATIO,
     DIVIDE_MIN_AGE,
     TEMP_MUT_DEFAULT,
+    MOVEMENT_SCALE,
 )
 from spatial import get_neighbors
 from memory import CellMemory
@@ -464,7 +465,7 @@ class Cell:
         else:
             temp_speed_mult = 1.0  # Optimal range
 
-        effective_speed = self.genome.speed * temp_speed_mult
+        effective_speed = self.genome.speed * temp_speed_mult * MOVEMENT_SCALE
         self.x = max(
             0.0, min(float(W - SB - 1), self.x + blended[0] * effective_speed * dt)
         )

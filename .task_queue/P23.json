@@ -1,0 +1,11 @@
+{
+  "id": "P23",
+  "title": "Fix PHOT fleeing from non-predators",
+  "priority": "P0",
+  "details": "B1: In cell.py:270-284, invert condition so PHOT flees from ZOOP (predator) not PHOT/POLY.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

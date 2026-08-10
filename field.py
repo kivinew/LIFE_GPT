@@ -349,7 +349,8 @@ class ResourceField:
                     intensities = d[gy, gx]
                     active = intensities > 0.01
                     if np.any(active):
-                        cr, cg, cb = cell_color
+                        # cell_color may be a pygame.Color (4-tuple) or an RGB tuple
+                        cr, cg, cb = cell_color[0], cell_color[1], cell_color[2]
                         g_ = (intensities[active] * 255).astype(np.uint8)
                         rgbs = np.stack([
                             (g_ * cr // 255).astype(np.uint8),

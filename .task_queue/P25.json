@@ -1,0 +1,11 @@
+{
+  "id": "P25",
+  "title": "Fix Ctrl+M and F hotkey dead code",
+  "priority": "P1",
+  "details": "A3+A4: Reorder hotkey checks in hotkeys.py - check modifiers before bare K_m, fix F recenter being unreachable.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

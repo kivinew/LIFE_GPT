@@ -1,0 +1,11 @@
+{
+  "id": "P34",
+  "title": "Add PHOT drain from zoophagy proximity",
+  "priority": "P2",
+  "details": "D3: In cell.py:483-501, add PHOT_DRAIN_RATE so PHOT loses energy when ZOOP/POLY feed nearby.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

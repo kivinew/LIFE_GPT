@@ -1,0 +1,11 @@
+{
+  "id": "P24",
+  "title": "Fix kill recording as cooperation",
+  "priority": "P0",
+  "details": "B2: In cell.py:590-591, replace record_cooperation() with record_threat() for victim class after kill.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

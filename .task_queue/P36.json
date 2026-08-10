@@ -1,0 +1,11 @@
+{
+  "id": "P36",
+  "title": "Make biomes coherent regions not noise",
+  "priority": "P3",
+  "details": "E3: In field.py:103-108, replace random per-pixel assignment with Perlin noise or flood fill for coherent biome regions.",
+  "status": "pending",
+  "assignee": null,
+  "claimed_at": null,
+  "done_at": null,
+  "notes": ""
+}

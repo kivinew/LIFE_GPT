@@ -83,6 +83,7 @@ from config import (
     MAJOR_SENSE_RATE,
     DIET_DEFAULT_SPEED,
     DIET_DEFAULT_SENSE,
+    MOVEMENT_SCALE,
     ZOO_PHAGY_MIN,
     ZOO_PHAGY_MAX,
     ZOO_PHAGY_DEFAULT,
@@ -990,7 +991,7 @@ def main():
                         ys = np.array([c.y for c in cells], dtype=np.float64)
                         de = np.array([c.energy for c in cells], dtype=np.float64)
                         di = np.array([c.genome.diet for c in cells], dtype=np.int32)
-                        sp = np.array([c.genome.speed for c in cells], dtype=np.float64)
+                        sp = np.array([c.genome.speed for c in cells], dtype=np.float64) * MOVEMENT_SCALE
                         ma = np.array([c.genome.mass for c in cells], dtype=np.float64)
                         me = np.array(
                             [c.genome.metabolism for c in cells], dtype=np.float64
