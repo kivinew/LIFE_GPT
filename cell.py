@@ -904,8 +904,12 @@ class Cell:
             return
         lx, ly = lx / llen, ly / llen
 
-        # Exponential smoothing: rate 0.25 means ~15% of remaining angle per tick
-        smooth_rate = 0.25
+        # Exponential smoothing toward the target direction.
+        # smooth_rate is a per-SECOND rate; dt is per-tick (1/60 s), so the
+        # effective per-tick step is smooth_rate*dt. A small per-tick step makes
+        # the arrow turn gradually (no jitter). Floor at 6.0 => ~0.1/tick at 60Hz,
+        # which eases the facing toward the (already inertia-smoothed) _dir.
+        smooth_rate = max(0.25, 6.0)
         t = 1.0 - math.exp(-smooth_rate * max(dt, 0.001))
         nx = lx + (tx - lx) * t
         ny = ly + (ty - ly) * t

@@ -1001,6 +1001,8 @@ def main():
                         bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
                         td = np.zeros(n, dtype=np.int8)
                         fd = field.data.copy()
+                        _old_xs = xs.copy()
+                        _old_ys = ys.copy()
 
                         apply_physics(xs, ys, bdx, bdy, sp, FIXED_DT)
                         apply_metabolism_and_feeding(xs, ys, de, di, sp, ma, me, le, fd, FIXED_DT)
@@ -1027,6 +1029,26 @@ def main():
                                 c._dir = (c._dir[0], -c._dir[1])
                                 c.best_dir = (c.best_dir[0], -c.best_dir[1])
                                 c.y = float(H - 1)
+                            # Facing follows ACTUAL movement. apply_physics does not
+                            # update _dir, so without this look_dir froze at __init__
+                            # (0,1)=down. Smooth _dir with inertia (like move_phase) so
+                            # the visible arrow turns gradually instead of jittering.
+                            ddx = c.x - float(_old_xs[i])
+                            ddy = c.y - float(_old_ys[i])
+                            dmag = (ddx * ddx + ddy * ddy) ** 0.5
+                            if dmag > 1e-6:
+                                mdx, mdy = ddx / dmag, ddy / dmag
+                                _ix, _iy = c._dir
+                                ilen = (_ix * _ix + _iy * _iy) ** 0.5
+                                if ilen > 1e-6:
+                                    _ix, _iy = _ix / ilen, _iy / ilen
+                                inertia = 0.85
+                                nx = _ix * inertia + mdx * (1.0 - inertia)
+                                ny = _iy * inertia + mdy * (1.0 - inertia)
+                                nlen = (nx * nx + ny * ny) ** 0.5
+                                if nlen > 1e-6:
+                                    c._dir = (nx / nlen, ny / nlen)
+                                # look_dir is smoothed toward _dir by update_look_dir()
                             c.energy = float(de[i])
                             c.genome.mass = float(ma[i])
                             c.level = int(le[i])
