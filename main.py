@@ -1009,6 +1009,24 @@ def main():
                         for i, c in enumerate(cells):
                             c.x = float(xs[i])
                             c.y = float(ys[i])
+                            # Wall bounce: reflect direction at boundaries so cells
+                            # don't pile up at edges (mirrors Cell.move_phase).
+                            if c.x <= 0.0:
+                                c._dir = (-c._dir[0], c._dir[1])
+                                c.best_dir = (-c.best_dir[0], c.best_dir[1])
+                                c.x = 0.0
+                            elif c.x >= float(W - SB - 1):
+                                c._dir = (-c._dir[0], c._dir[1])
+                                c.best_dir = (-c.best_dir[0], c.best_dir[1])
+                                c.x = float(W - SB - 1)
+                            if c.y <= 0.0:
+                                c._dir = (c._dir[0], -c._dir[1])
+                                c.best_dir = (c.best_dir[0], -c.best_dir[1])
+                                c.y = 0.0
+                            elif c.y >= float(H - 1):
+                                c._dir = (c._dir[0], -c._dir[1])
+                                c.best_dir = (c.best_dir[0], -c.best_dir[1])
+                                c.y = float(H - 1)
                             c.energy = float(de[i])
                             c.genome.mass = float(ma[i])
                             c.level = int(le[i])

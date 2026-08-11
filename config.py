@@ -34,7 +34,7 @@ DIET_DEFAULT_SENSE = {PHOT: 30.0, ZOOP: 120.0, POLY: 65.0}
 # Speed values are ~px/sec; multiplied by FIXED_DT (1/60) per tick they yield
 # <1px/tick, so cells crawl. This lifts the effective per-tick displacement to a
 # visible, huntable rate while staying tunable in one place.
-MOVEMENT_SCALE = 15.0  # ~PHOT 7.5, POLY 30, ZOOP 60 px/sec
+MOVEMENT_SCALE = 40.0  # ~PHOT 20, POLY 80, ZOOP 160 px/sec
 
 # ── Energy coefficients ──────────────────────────────────────────
 ENERGY_MASS_COEFF = 4.5  # Was 5.5 — reduced to prevent cells living too long

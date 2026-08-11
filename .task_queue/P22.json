@@ -3,9 +3,9 @@
   "title": "Unify Cython and Python level-up systems",
   "priority": "P0",
   "details": "A2: Align level-up thresholds (use 75% of next tier), energy after level-up (70% of new max), and mass growth (exponential mass*1.15) in sim_core.pyx to match cell.py.",
-  "status": "pending",
-  "assignee": null,
-  "claimed_at": null,
-  "done_at": null,
+  "status": "done",
+  "assignee": "executor",
+  "claimed_at": "2026-08-11T23:02:23.558692",
+  "done_at": "2026-08-11T23:14:46.225506",
   "notes": ""
 }

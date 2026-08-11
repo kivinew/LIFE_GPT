@@ -85,6 +85,13 @@ from config import (
 from spatial import get_neighbors
 from memory import CellMemory
 
+# Detect Cython sim_core availability (shared with main.py)
+try:
+    from sim_core import apply_physics, apply_metabolism_and_feeding
+    _HAVE_SIM_CORE = True
+except ImportError:
+    _HAVE_SIM_CORE = False
+
 # Diet → hue (green=phot, red=zoop, purple=poly). Each class gets its own
 # combination of hue within the diet family + brightness/saturation, so
 # cells of different classes are visually distinct while the diet stays
@@ -466,10 +473,28 @@ class Cell:
             temp_speed_mult = 1.0  # Optimal range
 
         effective_speed = self.genome.speed * temp_speed_mult * MOVEMENT_SCALE
-        self.x = max(
-            0.0, min(float(W - SB - 1), self.x + blended[0] * effective_speed * dt)
-        )
-        self.y = max(0.0, min(float(H - 1), self.y + blended[1] * effective_speed * dt))
+        new_x = self.x + blended[0] * effective_speed * dt
+        new_y = self.y + blended[1] * effective_speed * dt
+        # Wall bounce: reflect direction at boundaries instead of sticking
+        # (prevents cells piling at edges and looking "stuck downward").
+        if new_x <= 0.0:
+            new_x = 0.0
+            self._dir = (-self._dir[0], self._dir[1])
+            self.best_dir = (-self.best_dir[0], self.best_dir[1])
+        elif new_x >= float(W - SB - 1):
+            new_x = float(W - SB - 1)
+            self._dir = (-self._dir[0], self._dir[1])
+            self.best_dir = (-self.best_dir[0], self.best_dir[1])
+        if new_y <= 0.0:
+            new_y = 0.0
+            self._dir = (self._dir[0], -self._dir[1])
+            self.best_dir = (self.best_dir[0], -self.best_dir[1])
+        elif new_y >= float(H - 1):
+            new_y = float(H - 1)
+            self._dir = (self._dir[0], -self._dir[1])
+            self.best_dir = (self.best_dir[0], -self.best_dir[1])
+        self.x = new_x
+        self.y = new_y
 
     # ── Phase 5: feeding ──
     def feed_phase(self, field, cells, grid, dt):
@@ -921,8 +946,10 @@ class Cell:
             self.memory_decay_tick()
         pack_decision = self.pack_phase(cells, grid)
         self.combat_phase(cells, grid, pack_decision, dt, field)
-        self.feed_phase(field, cells, grid, dt)
-        self.metabolism_phase(dt, field.temperature)
+        # feed_phase/metabolism_phase are handled by apply_metabolism_and_feeding in Cython mode
+        if not _HAVE_SIM_CORE:
+            self.feed_phase(field, cells, grid, dt)
+            self.metabolism_phase(dt, field.temperature)
         self.stress_phase()
         self._heartbeat_tick()
         self.level_phase()
@@ -1239,6 +1266,11 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False):
                             best_score = score
                             best_ang_x = math.cos(ang)
                             best_ang_y = math.sin(ang)
+                if best_score < 0.0:
+                    # No food sampled (all empty/uniform): pick a random direction,
+                    # not (0,1) downward, to avoid systemic downward drift.
+                    _a = random.random() * math.tau
+                    best_ang_x, best_ang_y = math.cos(_a), math.sin(_a)
                 bdx[i] = best_ang_x
                 bdy[i] = best_ang_y
 

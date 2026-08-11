@@ -12,6 +12,14 @@ cimport numpy as np
 cimport cython
 from libc.stdlib cimport rand, RAND_MAX
 from libc.math cimport cos as c_cos, sin as c_sin, sqrt as c_sqrt
+from libc.math cimport sqrt as c_sqrt_math
+
+# NumPy 2.x removed np.int32_t / np.int64_t aliases; map them explicitly so the
+# compiled extension accepts the exact-width buffers that callers build with
+# dtype=np.int32 / np.int64. Without this, `cy_sense_food` raises
+# "Buffer dtype mismatch, expected 'int32_t' but got 'long'" on numpy>=2.
+ctypedef np.int32_t int32_npy
+ctypedef np.int64_t int64_npy
 
 # ── Constants (duplicated from config.py for Cython compile-time) ──
 # IMPORTANT: keep these in sync with config.py — edits to balance values in
@@ -35,6 +43,7 @@ cdef double _MASS_PENALTY = 0.0028             # config: MASS_PENALTY
 cdef double _FEED_EFFICIENCY_BASE = 22.0       # config: FEED_EFFICIENCY_BASE (was 18.0)
 cdef double _PHOT_FEED_EFFICIENCY = 1.0        # config: PHOT_FEED_EFFICIENCY
 cdef double _POLY_FEED_EFFICIENCY = 0.7        # config: POLY_FEED_EFFICIENCY
+cdef double _MIN_MASS = 1.0                     # config: minimum cell mass
 cdef double _MIN_MASS_EFFICIENCY = 0.55        # config: MIN_MASS_EFFICIENCY
 cdef double _COMBAT_BASE_DAMAGE = 0.9          # config: COMBAT_BASE_DAMAGE
 cdef double _COMBAT_DAMAGE_GAIN = 0.8          # config: COMBAT_DAMAGE_GAIN
@@ -93,11 +102,11 @@ def apply_metabolism_and_feeding(
     np.ndarray[np.float64_t, ndim=1] xs,
     np.ndarray[np.float64_t, ndim=1] ys,
     np.ndarray[np.float64_t, ndim=1] energies,
-    np.ndarray[np.int32_t, ndim=1] diet_arr,
+    np.ndarray[int32_npy, ndim=1] diet_arr,
     np.ndarray[np.float64_t, ndim=1] speed_arr,
     np.ndarray[np.float64_t, ndim=1] mass_arr,
     np.ndarray[np.float64_t, ndim=1] metab_arr,
-    np.ndarray[np.int32_t, ndim=1] level_arr,
+    np.ndarray[int32_npy, ndim=1] level_arr,
     np.ndarray[np.float64_t, ndim=2] field_data,
     double dt,
 ):
@@ -141,12 +150,31 @@ def apply_metabolism_and_feeding(
             energies[i] = max_e
 
         # ── Level system ──
-        if energies[i] >= max_e * _LEVEL_UP_THRESHOLD and level_arr[i] < _MAX_LEVEL:
-            level_arr[i] += 1
-            mass_arr[i] = _LEVEL_MASS_BASE + level_arr[i] * _LEVEL_MASS_STEP
-            energies[i] = max_e * 0.20
-        elif energies[i] <= _LEVEL_DOWN_THRESHOLD and level_arr[i] > 0:
-            level_arr[i] -= 1
+        # Level up: if at current level, 75% of next tier's max energy is met
+        if level_arr[i] < _MAX_LEVEL:
+            next_mass = mass_arr[i] * 1.15
+            if next_mass > 8.0:
+                next_mass = 8.0
+            next_max = next_mass * next_mass * _ENERGY_MASS_COEFF
+            if energies[i] >= next_max * 0.75:
+                level_arr[i] += 1
+                mass_arr[i] = next_mass
+                new_max = mass_arr[i] * mass_arr[i] * _ENERGY_MASS_COEFF
+                energies[i] = new_max * 0.70
+
+        # Level down: if at max level, energy falls below threshold, decrease level
+        if energies[i] <= _LEVEL_DOWN_THRESHOLD and level_arr[i] > 0:
+            # Calculate current mass limit
+            max_mass = max(_MIN_MASS, c_sqrt_math(energies[i] / _ENERGY_MASS_COEFF))
+            current_mass = mass_arr[i]
+            target_mass = current_mass * 0.9  # Reduce mass by 10%
+            if target_mass >= _MIN_MASS and target_mass <= 8.0 and target_mass < current_mass:
+                mass_arr[i] = target_mass
+                new_max = mass_arr[i] * mass_arr[i] * _ENERGY_MASS_COEFF
+                # Cap to current energy for smooth transition
+                cap_energy = min(energies[i], new_max)
+                energies[i] = cap_energy * 0.95
+                level_arr[i] -= 1
 
 
 def build_spatial_grid(
@@ -200,7 +228,7 @@ def get_neighbors(dict grid, double x, double y, int radius):
 def cy_sense_food(
     np.ndarray[np.float64_t, ndim=1] xs,
     np.ndarray[np.float64_t, ndim=1] ys,
-    np.ndarray[np.int32_t, ndim=1] diet_arr,
+    np.ndarray[int32_npy, ndim=1] diet_arr,
     np.ndarray[np.float64_t, ndim=1] sense_arr,
     np.ndarray[np.float64_t, ndim=1] best_dx,
     np.ndarray[np.float64_t, ndim=1] best_dy,
@@ -231,8 +259,11 @@ def cy_sense_food(
             best_dx[i] = _bx / _bn
             best_dy[i] = _by / _bn
         else:
-            best_dx[i] = 0.0
-            best_dy[i] = 1.0
+            # Random fallback direction (NOT (0,1) downward — avoids systemic
+            # downward drift when rand() yields a zero vector).
+            _ang = <double>rand() / r_max * _PI2
+            best_dx[i] = c_cos(_ang)
+            best_dy[i] = c_sin(_ang)
 
         # Food ray sampling for PHOT/POLY cells only
         if diet_arr[i] == _PHOT or diet_arr[i] == _POLY:
