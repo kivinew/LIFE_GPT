@@ -552,7 +552,7 @@ class Cell:
                     and other.energy > 0
                     and other.genome.diet == ZOOP
                     and other.genome.interact >= COOP_INTERACT_THRESHOLD
-                    and other.cls != my_cls
+                    and other.cls != my_cls  # B4: pack members should be different class (same diet, different strain)
                 ):
                     dx = other.x - self.x
                     dy = other.y - self.y
@@ -610,13 +610,15 @@ class Cell:
 
                     enemy_cls = other.cls
                     if amount > 0:
+                        # B3 fix: increase threat when attacking, not decrease
                         if enemy_cls in self.memory._slots:
-                            self.memory._slots[enemy_cls].threat = max(
-                                0.0,
-                                self.memory._slots[enemy_cls].threat - self._lr * 0.05,
+                            self.memory._slots[enemy_cls].threat = min(
+                                1.0,
+                                self.memory._slots[enemy_cls].threat + self._lr * 0.05,
                             )
+                    # B2 fix: record_threat for killed prey, not cooperation
                     if other.energy <= 0:
-                        self.memory.record_cooperation(enemy_cls, magnitude=0.5)
+                        self.memory.record_threat(enemy_cls, magnitude=0.5)
 
                     if my_diet in (ZOOP, POLY):
                         mass_eff = max(

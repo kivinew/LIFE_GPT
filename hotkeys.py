@@ -365,5 +365,5 @@ def handle_key(e, st):
             st.cells.append(Cell(W // 2, H // 2, g))
 
     elif k == pygame.K_HOME:
-        st.cam_x, st.cam_y, st.zoom = 0.0, 0.0, 1.0
+        st.cam_x, st.cam_y, st.zoom = (config.W - config.SB) / 2, config.H / 2, 1.0
         st.follow_mode = False
