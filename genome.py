@@ -12,6 +12,8 @@ from config import (
     TEMP_MUT_NEUTRAL,
     TEMP_MUT_SWING,
     TEMP_MUT_DEFAULT,
+    BASE_LIFESPAN_TICKS,
+    LIFESPAN_PER_MASS,
 )
 
 
@@ -98,7 +100,7 @@ class Genome:
         self.dmg_poly = max(0.1, min(3.0, float(dmg_poly)))
 
         if lifespan_ticks is None:
-            base = 3000 + self.mass * 200
+            base = BASE_LIFESPAN_TICKS + self.mass * LIFESPAN_PER_MASS
             self.lifespan_ticks = int(base * random.uniform(0.85, 1.15))
         else:
             self.lifespan_ticks = max(500, int(lifespan_ticks))

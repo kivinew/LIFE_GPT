@@ -560,6 +560,8 @@ def main():
     world_w, world_h = W - SB, H
     world_surf = pygame.Surface((world_w, world_h))
     scaled_surf = None
+    _scaled_zoom_surf = None
+    _scaled_zoom = 0.0
 
     map_size = 200
     map_rect = pygame.Rect(COL_RX, 452, map_size, map_size)
@@ -600,6 +602,30 @@ def main():
     MAX_SUBSTEPS = 5       # Maximum sub-steps per frame (prevents spiral of death)
     sim_accumulator = 0.0  # Time accumulator for fixed-step
     prev_cells_state = None  # Previous frame state for interpolation
+
+    # Pre-allocated NumPy buffers for Cython path — avoid per-tick allocation
+    _MAX_BUFFER_CELLS = MAX_CELLS + 100
+    _nx_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _ny_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _nde_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _ndi_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.int32)
+    _nsp_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _nma_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _nme_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _nle_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.int32)
+    _nbdx_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _nbdy_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _nsense_buf = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    # Buffers for vectorized sensory phase
+    _vs_xs = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _vs_ys = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _vs_di = np.empty(_MAX_BUFFER_CELLS, dtype=np.int32)
+    _vs_se = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _vs_en = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _vs_cls = np.empty(_MAX_BUFFER_CELLS, dtype=np.int64)
+    _vs_bdx = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _vs_bdy = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
+    _vs_cau = np.empty(_MAX_BUFFER_CELLS, dtype=np.float64)
 
     st = HotkeyState(
         cells=cells,
@@ -961,56 +987,53 @@ def main():
                 # Simulation (inside fixed-step loop)
                 grid_wrapper.refresh()
                 if _HAVE_SIM_CORE:
+                    n_cells = len(cells)
                     # Bulk food ray sampling (Cython-accelerated sensory_phase)
-                    if _HAVE_CY_FOOD_SENSE and cells:
-                        _n = len(cells)
-                        _xs = np.array([c.x for c in cells], dtype=np.float64)
-                        _ys = np.array([c.y for c in cells], dtype=np.float64)
-                        _di = np.array([c.genome.diet for c in cells], dtype=np.int32)
-                        _sense = np.array(
-                            [max(8.0, c.genome.sense) for c in cells], dtype=np.float64
-                        )
-                        _bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
-                        _bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
-                        cy_sense_food(_xs, _ys, _di, _sense, _bdx, _bdy,
-                                      field.data, _n, W - SB, H)
+                    if _HAVE_CY_FOOD_SENSE and n_cells > 0:
+                        _nx_buf[:n_cells] = [c.x for c in cells]
+                        _ny_buf[:n_cells] = [c.y for c in cells]
+                        _ndi_buf[:n_cells] = [c.genome.diet for c in cells]
+                        _nsense_buf[:n_cells] = [max(8.0, c.genome.sense) for c in cells]
+                        _nbdx_buf[:n_cells] = [c.best_dir[0] for c in cells]
+                        _nbdy_buf[:n_cells] = [c.best_dir[1] for c in cells]
+                        cy_sense_food(_nx_buf[:n_cells], _ny_buf[:n_cells], _ndi_buf[:n_cells], _nsense_buf[:n_cells],
+                                      _nbdx_buf[:n_cells], _nbdy_buf[:n_cells],
+                                      field.data, n_cells, W - SB, H)
                         for i, c in enumerate(cells):
-                            c.best_dir = (float(_bdx[i]), float(_bdy[i]))
+                            c.best_dir = (_nbdx_buf[i], _nbdy_buf[i])
 
                     # Per-cell sensory (neighbor-based logic; food rays done by cy_sense_food)
                     if _HAVE_CY_FOOD_SENSE:
-                        # Use vectorized NumPy neighbor calculations
+                        # Use vectorized NumPy neighbor calculations with pre-allocated buffers
                         from cell import vectorized_sensory_phase
-                        vectorized_sensory_phase(cells, grid_wrapper.grid, field, FIXED_DT, skip_food_ray=True)
+                        vectorized_sensory_phase(cells, grid_wrapper.grid, field, FIXED_DT, skip_food_ray=True,
+                                                 xs=_vs_xs, ys=_vs_ys, di=_vs_di, se=_vs_se, en=_vs_en,
+                                                 cls=_vs_cls, bdx=_vs_bdx, bdy=_vs_bdy, cau=_vs_cau)
                     else:
                         for c in cells:
                             c.sensory_phase(field, cells, grid_wrapper.grid, FIXED_DT, skip_food_ray=False)
-                    n = len(cells)
-                    if n > 0:
-                        xs = np.array([c.x for c in cells], dtype=np.float64)
-                        ys = np.array([c.y for c in cells], dtype=np.float64)
-                        de = np.array([c.energy for c in cells], dtype=np.float64)
-                        di = np.array([c.genome.diet for c in cells], dtype=np.int32)
-                        sp = np.array([c.genome.speed for c in cells], dtype=np.float64) * MOVEMENT_SCALE
-                        ma = np.array([c.genome.mass for c in cells], dtype=np.float64)
-                        me = np.array(
-                            [c.genome.metabolism for c in cells], dtype=np.float64
-                        )
-                        le = np.array([c.level for c in cells], dtype=np.int32)
-                        bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
-                        bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
-                        td = np.zeros(n, dtype=np.int8)
+                    if n_cells > 0:
+                        _nsp_buf[:n_cells] = [c.genome.speed * MOVEMENT_SCALE for c in cells]
+                        _nma_buf[:n_cells] = [c.genome.mass for c in cells]
+                        _nme_buf[:n_cells] = [c.genome.metabolism for c in cells]
+                        _nle_buf[:n_cells] = [c.level for c in cells]
                         fd = field.data.copy()
-                        _old_xs = xs.copy()
-                        _old_ys = ys.copy()
+                        _old_xs = _nx_buf[:n_cells].copy()
+                        _old_ys = _ny_buf[:n_cells].copy()
 
-                        apply_physics(xs, ys, bdx, bdy, sp, FIXED_DT)
-                        apply_metabolism_and_feeding(xs, ys, de, di, sp, ma, me, le, fd, FIXED_DT)
+                        apply_physics(_nx_buf[:n_cells], _ny_buf[:n_cells],
+                                      _nbdx_buf[:n_cells], _nbdy_buf[:n_cells],
+                                      _nsp_buf[:n_cells], FIXED_DT)
+                        apply_metabolism_and_feeding(_nx_buf[:n_cells], _ny_buf[:n_cells],
+                                                     _nde_buf[:n_cells], _ndi_buf[:n_cells],
+                                                     _nsp_buf[:n_cells], _nma_buf[:n_cells],
+                                                     _nme_buf[:n_cells], _nle_buf[:n_cells],
+                                                     fd, FIXED_DT)
                         field.data[:] = fd
 
                         for i, c in enumerate(cells):
-                            c.x = float(xs[i])
-                            c.y = float(ys[i])
+                            c.x = float(_nx_buf[i])
+                            c.y = float(_ny_buf[i])
                             # Wall bounce: reflect direction at boundaries so cells
                             # don't pile up at edges (mirrors Cell.move_phase).
                             if c.x <= 0.0:
@@ -1049,13 +1072,13 @@ def main():
                                 if nlen > 1e-6:
                                     c._dir = (nx / nlen, ny / nlen)
                                 # look_dir is smoothed toward _dir by update_look_dir()
-                            c.energy = float(de[i])
-                            c.genome.mass = float(ma[i])
-                            c.level = int(le[i])
+                            c.energy = float(_nde_buf[i])
+                            c.genome.mass = float(_nma_buf[i])
+                            c.level = int(_nle_buf[i])
 
                         for c in cells:
                             if c.energy > 0:
-                                c.post_step(field, cells, grid_wrapper.grid, td, FIXED_DT, 0)
+                                c.post_step(field, cells, grid_wrapper.grid, _nde_buf[:n_cells], FIXED_DT, 0)
                 else:
                     for c in cells:
                         if c.energy > 0:
@@ -1142,28 +1165,56 @@ def main():
         # 1. Build world at native (unzoomed) resolution
         world_w, world_h = W - SB, H
         if scaled_surf is None or prev_zoom != zoom:
-            scaled_surf = pygame.Surface((world_w, world_h))
+            if scaled_surf is None:
+                scaled_surf = pygame.Surface((world_w, world_h))
+            else:
+                scaled_surf.fill(BG)
+            world_surf = scaled_surf
+
+            field.draw(
+                world_surf,
+                season=season_name,
+                season_progress=season_progress,
+                next_season=SEASON_ORDER[(season_idx + 1) % 4],
+            )
+            for cp in corpses:
+                if -50 < cp.x < world_w + 50 and -50 < cp.y < world_h + 50:
+                    cp.draw_at(world_surf, cp.x, cp.y)
+            for c in cells:
+                if -50 < c.x < world_w + 50 and -50 < c.y < world_h + 50:
+                    c.draw_at(world_surf, c.x, c.y)
+            # Rebuild scaled surface only when zoom changes
+            _scaled_w = max(1, int(world_w * zoom))
+            _scaled_h = max(1, int(world_h * zoom))
+            if _scaled_zoom_surf is None or _scaled_zoom != zoom:
+                _scaled_zoom_surf = pygame.Surface((_scaled_w, _scaled_h))
+                pygame.transform.smoothscale(world_surf, (_scaled_w, _scaled_h), _scaled_zoom_surf)
+                _scaled_zoom = zoom
+            scaled = _scaled_zoom_surf
         else:
-            scaled_surf.fill(BG)
-        world_surf = scaled_surf  # reuse
-
-        field.draw(
-            world_surf,
-            season=season_name,
-            season_progress=season_progress,
-            next_season=SEASON_ORDER[(season_idx + 1) % 4],
-        )
-        for cp in corpses:
-            if -50 < cp.x < world_w + 50 and -50 < cp.y < world_h + 50:
-                cp.draw_at(world_surf, cp.x, cp.y)
-        for c in cells:
-            if -50 < c.x < world_w + 50 and -50 < c.y < world_h + 50:
-                c.draw_at(world_surf, c.x, c.y)
-
-        # 2. Scale to zoom
-        sw = max(1, int(world_w * zoom))
-        sh = max(1, int(world_h * zoom))
-        scaled = pygame.transform.smoothscale(world_surf, (sw, sh))
+            # Zoom unchanged — only redraw changed parts (field is static per frame)
+            world_surf = scaled_surf
+            world_surf.fill(BG)
+            # Redraw field (it's the background)
+            field.draw(
+                world_surf,
+                season=season_name,
+                season_progress=season_progress,
+                next_season=SEASON_ORDER[(season_idx + 1) % 4],
+            )
+            for cp in corpses:
+                if -50 < cp.x < world_w + 50 and -50 < cp.y < world_h + 50:
+                    cp.draw_at(world_surf, cp.x, cp.y)
+            for c in cells:
+                if -50 < c.x < world_w + 50 and -50 < c.y < world_h + 50:
+                    c.draw_at(world_surf, c.x, c.y)
+            # Scale with fast nearest-neighbor at higher zooms for speed
+            sw = max(1, int(world_w * zoom))
+            sh = max(1, int(world_h * zoom))
+            if zoom < 1.5:
+                scaled = pygame.transform.smoothscale(world_surf, (sw, sh))
+            else:
+                scaled = pygame.transform.scale(world_surf, (sw, sh))
 
         # 3. Center on camera
         dx = (W - SB) // 2 - int(cam_x * zoom)

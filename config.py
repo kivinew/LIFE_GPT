@@ -85,11 +85,6 @@ PHOT_INITIAL_ENERGY = (
 # Metabolism increases with age (0.0 = no increase, 1.0 = 2x at max lifespan)
 AGING_METABOLISM_FACTOR = 0.5
 
-# ── Zoophage hunting AI constants ──────────────────────────────────────
-ZOO_WEAK_TARGET_THRESHOLD = (
-    0.3  # Energy threshold to consider prey weak (lower value = weaker)
-)
-
 # ── Major mutation AI constants ──────────────────────────────────────
 MAJOR_DIET_RATE = 0.3  # 30% chance of major mutation creating new diet (reduced from 0.5)
 MAJOR_SENSE_RATE = 0.5  # 50% chance of major mutation creating new sense organ
@@ -106,7 +101,8 @@ INTERACT_MIN = 0.01
 INTERACT_MAX = 1.0
 PASS = 0
 
-COOP_TRANSFER_PRESERVE = 50.0
+# B5: reduced from 50 to 10 so low-energy ZOOP can still transfer some energy
+COOP_TRANSFER_PRESERVE = 10.0
 
 # Spatial grid
 LEARNING_RATE_BASE = 0.05  # base speed of adaptation from experience
@@ -147,7 +143,6 @@ SEASON_FOOD_COLORS = {
 
 # ── Food lifetime ───────────────────────────────────────────────────────────
 # Food decays over time to prevent indefinite accumulation
-FOOD_LIFETIME_TICKS = 3000  # approximate lifetime before food fades to half
 FOOD_DECAY_RATE = 0.001    # fraction lost per tick (~50% in 693 ticks)
 
 # ── Food generation ─────────────────────────────────────────────────────────

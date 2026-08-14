@@ -114,26 +114,6 @@ class ResourceField:
             return self._biome_names[self.biomes[xi, yi]]
         return "foresta"  # Default to forest
 
-    def get_biome_multiplier(self, x, y, multiplier_type="regen_mult"):
-        """Get biome-specific multiplier for a given cell."""
-        biome_name = self.get_biome(x, y)
-        biome_data = self.biome_registry.get(biome_name, self.biome_registry["foresta"])
-        return biome_data.get(multiplier_type, 1.0)
-
-    def get_biome_temperature(self, x, y):
-        """Get biome-specific base temperature for a cell."""
-        biome_name = self.get_biome(x, y)
-        biome_data = self.biome_registry.get(biome_name, self.biome_registry["foresta"])
-        temp_range = biome_data.get("temperature_range", (0.5, 0.5))
-        return random.uniform(temp_range[0], temp_range[1])
-
-    def analyze_biome_distribution(self):
-        """Analyze and return statistics about biome distribution."""
-        distribution = {name: 0 for name in self._biome_names}
-        for biome_idx, count in zip(*np.unique(self.biomes, return_counts=True)):
-            distribution[self._biome_names[int(biome_idx)]] = int(count)
-        return distribution
-
     def add_nutrient_cluster(self, x, y, amount, cell_color=None) -> None:
         x, y = int(x), int(y)
         if 0 <= x < self.w and 0 <= y < self.h and amount > 0.01:

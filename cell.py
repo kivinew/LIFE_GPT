@@ -148,7 +148,9 @@ def play_sound(name: str):
 # Cache for cell body gradient surfaces, keyed by (cls, radius, energy_band, selected).
 # Avoids per-frame Surface allocation + r circle draws per cell — the biggest rendering cost.
 _cell_surface_cache: dict = {}
-_ENERGY_BANDS = 5  # Quantize energy_ratio into bands to bound cache size
+_energy_band_cache: dict = {}
+_sense_ring_cache: dict = {}
+_DIRECTION_BANDS = 5  # Quantize energy_ratio into bands to bound cache size
 
 
 def _get_cached_cell_surface(cls, radius, col, energy_ratio, selected):
@@ -159,14 +161,14 @@ def _get_cached_cell_surface(cls, radius, col, energy_ratio, selected):
     so that color changes from refresh_class() naturally produce new entries.
     An entire-cache flush prevents unbounded growth across long simulations.
     """
-    band = min(_ENERGY_BANDS - 1, int(energy_ratio * _ENERGY_BANDS))
+    band = min(_DIRECTION_BANDS - 1, int(energy_ratio * _DIRECTION_BANDS))
     cache_key = (cls, radius, band, selected)
     ss = _cell_surface_cache.get(cache_key)
     if ss is not None:
         return ss
     if len(_cell_surface_cache) > 2000:
         _cell_surface_cache.clear()
-    er = (band + 0.5) / _ENERGY_BANDS
+    er = (band + 0.5) / _DIRECTION_BANDS
     bright = tuple(int(c * (0.4 + 0.6 * er)) for c in col)
     dark = tuple(int(c * 0.2) for c in col)
     ss = pygame.Surface((radius * 2 + 4, radius * 2 + 4), pygame.SRCALPHA)
@@ -210,7 +212,6 @@ class Cell:
         self.reaction_type = None
         self.reaction_timer = 0
         self.chase_timer = 0
-        self.aggression = 0.0
         self.sick = False
         self.sick_timer = 0
 
@@ -282,7 +283,7 @@ class Cell:
                     other is not self
                     and other.energy > 0
                     and other.cls != self.cls
-                    and other.genome.diet != ZOOP
+                    and other.genome.diet == ZOOP  # B1 fix: flee from predators (ZOOP)
                 ):
                     dx, dy = other.x - self.x, other.y - self.y
                     dist_sq = dx * dx + dy * dy
@@ -503,7 +504,8 @@ class Cell:
             eat = field.consume(int(self.x), int(self.y), 0.15 * dt)
             if eat > 0 and self.selected:
                 play_sound("eating")
-            mass_eff = max(MIN_MASS_EFFICIENCY, 5.0 / self.genome.mass)
+            # D1: clamp efficiency to reasonable range
+            mass_eff = max(0.5, min(2.0, 5.0 / self.genome.mass))
             diet_eff = PHOT_FEED_EFFICIENCY if d == PHOT else POLY_FEED_EFFICIENCY
             self.energy += eat * FEED_EFFICIENCY_BASE * mass_eff * diet_eff
         elif d == ZOOP or d == POLY:
@@ -626,8 +628,6 @@ class Cell:
                         else:
                             de = POLY_FEED_EFFICIENCY
                         self.energy += amount * COMBAT_DAMAGE_GAIN * mass_eff * de
-                    else:
-                        self.aggression += amount * 0.5
 
     # ── Phase 7: metabolism ──
     def metabolism_phase(self, dt, temperature=0.7):
@@ -1114,9 +1114,15 @@ class Cell:
         surf.blit(ss, (x - cx, y - cy))
         if self.selected:
             sr = int(self.genome.sense)
-            ss = pygame.Surface((sr * 2, sr * 2), pygame.SRCALPHA)
-            pygame.draw.circle(ss, (100, 100, 255, 40), (sr, sr), sr)
-            surf.blit(ss, (x - sr, y - sr))
+            ring_key = (sr,)
+            ring_surf = _sense_ring_cache.get(ring_key)
+            if ring_surf is None:
+                ring_surf = pygame.Surface((sr * 2, sr * 2), pygame.SRCALPHA)
+                pygame.draw.circle(ring_surf, (100, 100, 255, 40), (sr, sr), sr)
+                if len(_sense_ring_cache) > 50:
+                    _sense_ring_cache.clear()
+                _sense_ring_cache[ring_key] = ring_surf
+            surf.blit(ring_surf, (x - sr, y - sr))
             pygame.draw.circle(surf, WHITE, (x, y), r + 2, 2)
 
         lx, ly = self.look_dir
@@ -1226,8 +1232,10 @@ class Corpse:
 
 
 # ── Vectorized neighbor calculation (NumPy fallback) ────────────────────────
-def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False):
-    """Batch-process sensory_phase for all cells using NumPy.
+def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False,
+                              xs=None, ys=None, di=None, se=None, en=None,
+                              cls=None, bdx=None, bdy=None, cau=None):
+    """Batch-process sensory_phase for all cells using NumPy with optional pre-allocated buffers.
 
     Replaces the per-cell Python loop with vectorized array operations
     for neighbor-based sensory logic (PHOT flee, ZOOP/POLY prey hunting).
@@ -1237,27 +1245,40 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False):
     if n == 0:
         return
 
-    xs = np.array([c.x for c in cells], dtype=np.float64)
-    ys = np.array([c.y for c in cells], dtype=np.float64)
-    diets = np.array([c.genome.diet for c in cells], dtype=np.int32)
-    senses = np.array([max(8.0, c.genome.sense) for c in cells], dtype=np.float64)
-    energies = np.array([c.energy for c in cells], dtype=np.float64)
-    cls_ids = np.array([c.cls for c in cells], dtype=np.int64)
-    bdx = np.array([c.best_dir[0] for c in cells], dtype=np.float64)
-    bdy = np.array([c.best_dir[1] for c in cells], dtype=np.float64)
-    cautious = np.array([c.genome.cautious for c in cells], dtype=np.float64)
+    # Use provided buffers or allocate fresh ones
+    _xs = xs if xs is not None else np.empty(n, dtype=np.float64)
+    _ys = ys if ys is not None else np.empty(n, dtype=np.float64)
+    _di = di if di is not None else np.empty(n, dtype=np.int32)
+    _se = se if se is not None else np.empty(n, dtype=np.float64)
+    _en = en if en is not None else np.empty(n, dtype=np.float64)
+    _cls = cls if cls is not None else np.empty(n, dtype=np.int64)
+    _bdx = bdx if bdx is not None else np.empty(n, dtype=np.float64)
+    _bdy = bdy if bdy is not None else np.empty(n, dtype=np.float64)
+    _cau = cau if cau is not None else np.empty(n, dtype=np.float64)
+
+    # Fill buffers from cell state
+    for i, c in enumerate(cells):
+        _xs[i] = c.x
+        _ys[i] = c.y
+        _di[i] = c.genome.diet
+        _se[i] = max(8.0, c.genome.sense)
+        _en[i] = c.energy
+        _cls[i] = c.cls
+        _bdx[i] = c.best_dir[0]
+        _bdy[i] = c.best_dir[1]
+        _cau[i] = c.genome.cautious
 
     field_w = W - SB
 
     # Food ray sampling (batched per cell, vectorized distance scoring)
     if not skip_food_ray:
         for i in range(n):
-            d = diets[i]
+            d = _di[i]
             if d in (PHOT, POLY):
-                sense = senses[i]
-                cx, cy = xs[i], ys[i]
+                sense = _se[i]
+                cx, cy = _xs[i], _ys[i]
                 best_score = -1.0
-                best_ang_x, best_ang_y = bdx[i], bdy[i]
+                best_ang_x, best_ang_y = _bdx[i], _bdy[i]
                 for _ray in range(16):
                     ang = random.random() * math.tau
                     dist = random.random() * sense
@@ -1275,14 +1296,14 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False):
                     # not (0,1) downward, to avoid systemic downward drift.
                     _a = random.random() * math.tau
                     best_ang_x, best_ang_y = math.cos(_a), math.sin(_a)
-                bdx[i] = best_ang_x
-                bdy[i] = best_ang_y
+                _bdx[i] = best_ang_x
+                _bdy[i] = best_ang_y
 
     # Neighbor-based sensory logic (PHOT flee, ZOOP/POLY prey hunt)
     for i in range(n):
-        d = diets[i]
-        cx, cy = xs[i], ys[i]
-        sense = senses[i]
+        d = _di[i]
+        cx, cy = _xs[i], _ys[i]
+        sense = _se[i]
         sense_sq = sense * sense
 
         neighbors = get_neighbors(grid, cx, cy, radius=2)
@@ -1291,39 +1312,39 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False):
             continue
 
         # Vectorized distance calc to all neighbors
-        nx = np.array([xs[j] for j in neighbors], dtype=np.float64)
-        ny = np.array([ys[j] for j in neighbors], dtype=np.float64)
+        nx = np.array([_xs[j] for j in neighbors], dtype=np.float64)
+        ny = np.array([_ys[j] for j in neighbors], dtype=np.float64)
         dx_arr = nx - cx
         dy_arr = ny - cy
         dist_sq = dx_arr * dx_arr + dy_arr * dy_arr
 
-        # PHOT: flee from non-same-class non-ZOOP cells
+        # PHOT: flee from predators (ZOOP)
         if d == PHOT and random.random() < 0.35:
             threat_mask = np.zeros(len(neighbors), dtype=bool)
             for k, j in enumerate(neighbors):
-                if (energies[j] > 0 and cls_ids[j] != cls_ids[i] and diets[j] != ZOOP
+                if (_en[j] > 0 and _cls[j] != _cls[i] and _di[j] == ZOOP
                         and dist_sq[k] > 0 and dist_sq[k] <= min(sense, 50.0) ** 2):
                     threat_mask[k] = True
             threat_idx = np.where(threat_mask)[0]
             if len(threat_idx) > 0:
                 k = threat_idx[0]
                 angle = math.atan2(-dy_arr[k], -dx_arr[k]) + random.uniform(-0.5, 0.5)
-                bdx[i] = math.cos(angle)
-                bdy[i] = math.sin(angle)
+                _bdx[i] = math.cos(angle)
+                _bdy[i] = math.sin(angle)
 
         # ZOOP/POLY: hunt prey
         if d in (ZOOP, POLY):
             prey_mask = np.zeros(len(neighbors), dtype=bool)
             prey_scores = np.full(len(neighbors), -1.0)
             for k, j in enumerate(neighbors):
-                if energies[j] > 0 and cls_ids[j] != cls_ids[i]:
+                if _en[j] > 0 and _cls[j] != _cls[i]:
                     if dist_sq[k] > 0 and dist_sq[k] <= sense_sq:
                         prey_mask[k] = True
                         if d == ZOOP:
-                            mem_bias = 1.0 - cells[j].memory.coop(cls_ids[i]) * 0.3 if hasattr(cells[j], 'memory') else 1.0
-                            prey_scores[k] = energies[j] * mem_bias
+                            mem_bias = 1.0 - cells[j].memory.coop(_cls[i]) * 0.3 if hasattr(cells[j], 'memory') else 1.0
+                            prey_scores[k] = _en[j] * mem_bias
                         else:
-                            val = min(1.0, energies[j] / 100.0)
+                            val = min(1.0, _en[j] / 100.0)
                             prey_scores[k] = val / (1.0 + math.sqrt(dist_sq[k]) / sense)
             prey_idx = np.where(prey_mask)[0]
             if len(prey_idx) > 0:
@@ -1333,19 +1354,19 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False):
                     k = prey_idx[np.argmax(prey_scores[prey_idx])]
                 dist = math.sqrt(dist_sq[k])
                 if dist > 0:
-                    bdx[i] = dx_arr[k] / dist
-                    bdy[i] = dy_arr[k] / dist
+                    _bdx[i] = dx_arr[k] / dist
+                    _bdy[i] = dy_arr[k] / dist
 
         # ZOOP cautious flee when low energy
-        if d == ZOOP and energies[i] < 12.0:
-            if random.random() < cautious[i]:
+        if d == ZOOP and _en[i] < 12.0:
+            if random.random() < _cau[i]:
                 rand_x = random.uniform(-1, 1)
                 rand_y = random.uniform(-1, 1)
                 norm = math.hypot(rand_x, rand_y)
                 if norm > 0:
-                    bdx[i] = rand_x / norm
-                    bdy[i] = rand_y / norm
+                    _bdx[i] = rand_x / norm
+                    _bdy[i] = rand_y / norm
 
     # Write back best_dir
     for i, c in enumerate(cells):
-        c.best_dir = (float(bdx[i]), float(bdy[i]))
+        c.best_dir = (float(_bdx[i]), float(_bdy[i]))
