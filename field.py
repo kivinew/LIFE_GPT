@@ -32,10 +32,10 @@ class ResourceField:
         self.temperature: float = 0.7  # Global temperature (0.0-1.0)
         self.zoophagy_mult: float = 1.0  # Predator feeding efficiency multiplier
 
-        # Биомы: 2D uint8 массив индексов + список имён для быстрого доступа
+        # Biome system: 2D uint8 array + name lookup
         self.biome_registry = self._init_biome_registry()
         self._biome_names = list(self.biome_registry.keys())
-        self.biomes = np.zeros((w, h), dtype=np.uint8)  # Индексы биомов по (x, y)
+        self.biomes = np.zeros((w, h), dtype=np.uint8)  # Biome indices by (x, y)
         self.current_biome_index = 0
 
         # 2D field of energy values [0.0 .. 1.0]
@@ -45,6 +45,12 @@ class ResourceField:
         self.hotspots = []
         self.nutrient_clusters = []
         self._cluster_cache = {}  # id(cluster) -> (rgbs, cached_amount, gy_a, gx_a)
+
+        # Rendering cache: dirty flags to avoid unnecessary redraws
+        self._last_season = "spring"
+        self._last_next_season = "spring"
+        self._last_season_progress = -1.0
+        self._field_dirty = True  # Force initial render
 
         # Scatter initial energy seeds — dense enough for cells to find food
         for _ in range(3000):
@@ -282,6 +288,19 @@ class ResourceField:
         w, h = self.w, self.h
         d = self.data
 
+        # Check if redraw is needed (season/progress changed or field modified)
+        needs_redraw = (
+            self._field_dirty
+            or season != self._last_season
+            or next_season != self._last_next_season
+            or abs(season_progress - self._last_season_progress) > 0.01
+        )
+
+        if not needs_redraw and hasattr(self, "_fsurf"):
+            # Cache hit — just blit existing surface
+            surf.blit(self._fsurf, (0, 0))
+            return
+
         if not hasattr(self, "_fsurf") or self._fsurf.get_size() != (w, h):
             self._fsurf = pygame.Surface((w, h))
 
@@ -352,4 +371,14 @@ class ResourceField:
                 b = int(hv * 255)
                 self._fsurf.set_at((hx, hy), (b // 2, b, 0))
 
+        # Mark cached surface as up-to-date
+        self._last_season = season
+        self._last_next_season = next_season
+        self._last_season_progress = season_progress
+        self._field_dirty = False
+
         surf.blit(self._fsurf, (0, 0))
+
+    def mark_dirty(self):
+        """Mark field as needing redraw (called when data changes significantly)."""
+        self._field_dirty = True
