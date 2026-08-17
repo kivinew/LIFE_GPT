@@ -34,7 +34,7 @@ DIET_DEFAULT_SENSE = {PHOT: 30.0, ZOOP: 120.0, POLY: 65.0}
 # Speed values are ~px/sec; multiplied by FIXED_DT (1/60) per tick they yield
 # <1px/tick, so cells crawl. This lifts the effective per-tick displacement to a
 # visible, huntable rate while staying tunable in one place.
-MOVEMENT_SCALE = 40.0  # ~PHOT 20, POLY 80, ZOOP 160 px/sec
+MOVEMENT_SCALE = 80.0  # doubled for faster visible movement  # ~PHOT 20, POLY 80, ZOOP 160 px/sec
 
 # ── Energy coefficients ──────────────────────────────────────────
 ENERGY_MASS_COEFF = 4.5  # Was 5.5 — reduced to prevent cells living too long
@@ -65,8 +65,8 @@ MIN_MASS_DMG_EFF = 0.45
 # ── Level system ─────────────────────────────────────────────────
 LEVEL_UP_THRESHOLD = 0.60  # Was 0.50 — increased to slow PHOT leveling
 # ── Division conditions ─────────────────────────────────────
-DIVIDE_ENERGY_RATIO = 0.95  # Energy must be 95% of max to divide
-DIVIDE_MIN_AGE = 1000  # Minimum age before cell can divide
+DIVIDE_ENERGY_RATIO = 0.70  # Energy must be 95% of max to divide
+DIVIDE_MIN_AGE = 200  # Minimum age before cell can divide
 LEVEL_DOWN_THRESHOLD = 3.0
 MAX_LEVEL = 10
 LEVEL_MASS_BASE = 2.0
@@ -101,14 +101,14 @@ DIET_DEFAULT_SPEED = {0: 0.5, 1: 4.0, 2: 2.0}
 DIET_DEFAULT_SENSE = {0: 30.0, 1: 120.0, 2: 65.0}
 
 # Division
-DIVIDE_ENERGY_RATIO = 0.95
-DIVIDE_MIN_AGE = 1000
+DIVIDE_ENERGY_RATIO = 0.70
+DIVIDE_MIN_AGE = 200
 
 # Temp mutation
 TEMP_MUT_DEFAULT = 0.5
 
 # Movement
-MOVEMENT_SCALE = 40.0
+MOVEMENT_SCALE = 80.0  # doubled for faster visible movement
 
 # Zoophagy
 ZOO_PHAGY_MIN = 0.0
@@ -130,7 +130,7 @@ CORPSE_SCAVENGE_RATE = 0.008
 SEASON_ORDER = ["spring", "summer", "autumn", "winter"]
 SEASON_LENGTH = 2000
 SEASON_FACTORS = {"spring": 1.2, "summer": 1.0, "autumn": 0.8, "winter": 0.6}
-SEASON_TEMPERATURES = {"spring": 0.4, "summer": 0.7, "autumn": 0.3, "winter": 0.1}
+SEASON_TEMPERATURES = {"spring": 0.4, "summer": 0.7, "autumn": 0.3, "winter": 0.35}
 
 # Cell size
 CELL_SIZE = 16
@@ -170,10 +170,11 @@ MAX_CELLS = 500
 DECOMPOSITION_TICKS = 150  # visual decay duration of a corpse (ticks), reduced from 300
 LIFESPAN_PER_MASS = 200
 AGING_DAMAGE = 0.3
-ZOO_INITIAL_ENERGY = 50.0  # Raised from 35.0 — ZOOP starts with enough energy to hunt before starving
+ZOO_INITIAL_ENERGY = 80.0  # Raised from 35.0 — ZOOP starts with enough energy to hunt before starving
 PHOT_INITIAL_ENERGY = (
-    45.0  # Added — PHOT starts with more energy to survive initial period
+    70.0  # Added — PHOT starts with more energy to survive initial period
 )
+POLY_INITIAL_ENERGY = 60.0  # POLY starts with moderate energy
 
 # ── Aging metabolism ─────────────────────────────────────────────
 # Metabolism increases with age (0.0 = no increase, 1.0 = 2x at max lifespan)
@@ -215,7 +216,7 @@ SEASON_TEMPERATURES = {
     "spring": 0.45,  # прохладная, потепление
     "summer": 0.85,  # жара
     "autumn": 0.55,  # похолодание
-    "winter": 0.15,  # холод
+    "winter": 0.35,  # холод
 }
 TEMP_SEASON_OFFSET = (
     5.0  # градусы, которые добавляются к слайдеру в зависимости от сезона

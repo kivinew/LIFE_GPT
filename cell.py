@@ -58,6 +58,7 @@ from config import (
     LEARNING_RATE_BASE,
     ZOO_INITIAL_ENERGY,
     PHOT_INITIAL_ENERGY,
+    POLY_INITIAL_ENERGY,
     YEL,
     WHITE,
     CYAN,
@@ -196,7 +197,7 @@ class Cell:
         self.energy = (
             ZOO_INITIAL_ENERGY
             if self.genome.diet == ZOOP
-            else (PHOT_INITIAL_ENERGY if self.genome.diet == PHOT else 40.0)
+            else (PHOT_INITIAL_ENERGY if self.genome.diet == PHOT else POLY_INITIAL_ENERGY)
         )
         self.selected = False
         self._heartbeat_timer = 0
