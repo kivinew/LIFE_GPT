@@ -73,7 +73,101 @@ LEVEL_MASS_BASE = 2.0
 LEVEL_MASS_STEP = 0.6
 
 # ── Lifespan / aging ─────────────────────────────────────────────
+
+# Disease system
+DISEASE_CHANCE = 0.001
+DISEASE_DURATION = 500
+DISEASE_METABOLISM_MULT = 2.0
+DISEASE_TRANSMISSION_RANGE = 50.0
+
+# Migration
+MIGRATION_CHANCE = 0.001
+MIGRATION_DISTANCE = 100.0
+
+# Temperature
+TEMP_ENERGY_PENALTY = 0.02
+TEMP_METABOLISM_MIN = 0.5
+TEMP_FREEZE = 0.222
+
+# Aging
+AGING_METABOLISM_FACTOR = 0.5
+
+# Major mutation
+MAJOR_DIET_RATE = 0.5
+MAJOR_SENSE_RATE = 0.5
+
+# Diet defaults
+DIET_DEFAULT_SPEED = {0: 0.5, 1: 4.0, 2: 2.0}
+DIET_DEFAULT_SENSE = {0: 30.0, 1: 120.0, 2: 65.0}
+
+# Division
+DIVIDE_ENERGY_RATIO = 0.95
+DIVIDE_MIN_AGE = 1000
+
+# Temp mutation
+TEMP_MUT_DEFAULT = 0.5
+
+# Movement
+MOVEMENT_SCALE = 40.0
+
+# Zoophagy
+ZOO_PHAGY_MIN = 0.0
+ZOO_PHAGY_MAX = 1.0
+ZOO_PHAGY_DEFAULT = 0.5
+
+# Decomposition
+DECOMPOSITION_NUTRIENT_FRACTION = 0.45
+DECOMPOSITION_TICKS = 150
+
+# Corpse eating
+CORPSE_EAT_RADIUS = 35.0
+CORPSE_EAT_RATE = 0.02
+CORPSE_EAT_EFFICIENCY = 0.8
+CORPSE_ATTRACT_RADIUS = 80.0
+CORPSE_SCAVENGE_RATE = 0.008
+
+# Seasons
+SEASON_ORDER = ["spring", "summer", "autumn", "winter"]
+SEASON_LENGTH = 2000
+SEASON_FACTORS = {"spring": 1.2, "summer": 1.0, "autumn": 0.8, "winter": 0.6}
+SEASON_TEMPERATURES = {"spring": 0.4, "summer": 0.7, "autumn": 0.3, "winter": 0.1}
+
+# Cell size
+CELL_SIZE = 16
+
+# Min mass
+MIN_MASS = 1.0
+
+# Food
+FOOD_DECAY_RATE = 0.001
+FOOD_LIFETIME_TICKS = 3000
+
+# Temperature smooth
+TEMP_SMOOTH_RATE = 0.01
+
+# Min populations
+PHOT_MIN_REQUIRED = 2
+ZOOP_MIN_REQUIRED = 1
+POLY_MIN_REQUIRED = 2
+
+# Time lapse
+TIME_LAPSE_DEFAULT_FPS = 30
+TIME_LAPSE_FRAMES_DIR = "frames"
+TIME_LAPSE_MAX_FRAMES = 10000
+TIME_LAPSE_DURATION_MIN = 10
+
+# Max level
+MAX_LEVEL = 10
+
+# Corpse nutrient
+CORPSE_NUTRIENT_BOOST_RADIUS = 12
+CORPSE_NUTRIENT_BOOST_MULT = 2.5
+CORPSE_NUTRIENT_EXTRA_ENERGY = 0.5
+CORPSE_NUTRIENT_MIN_AMOUNT = 0.05
+
 BASE_LIFESPAN_TICKS = 3000
+MAX_CELLS = 500
+DECOMPOSITION_TICKS = 150  # visual decay duration of a corpse (ticks), reduced from 300
 LIFESPAN_PER_MASS = 200
 AGING_DAMAGE = 0.3
 ZOO_INITIAL_ENERGY = 50.0  # Raised from 35.0 — ZOOP starts with enough energy to hunt before starving
@@ -156,47 +250,9 @@ CORPSE_NUTRIENT_FIELD_RATE = (
     0.06  # cluster amount fed into the field per tick
 )
 CORPSE_NUTRIENT_FADE = (
-    0.96  # per-tick fade — faster decay for fewer active clusters
-)
-CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
-CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)
-CORPSE_NUTRIENT_BOOST_MULT = 2.5  # multiplier for boost consumption (was 2.0)
-CORPSE_NUTRIENT_EXTRA_ENERGY = 0.5  # extra energy per boost (was 0.3)
-CORPSE_NUTRIENT_MIN_AMOUNT = 0.05  # clusters below this are removed (was 0.1)
-
-# ── Disease ──────────────────────────────────────────────────────
-DISEASE_CHANCE = 0.001  # chance per tick to get infected
-DISEASE_DURATION = 500  # ticks of sickness
-DISEASE_METABOLISM_MULT = 2.0  # metabolism multiplier when sick
-DISEASE_TRANSMISSION_RANGE = 50.0  # transmission distance
-
-# ── Minimum populations to prevent extinction ────────────────────────────
-PHOT_MIN_REQUIRED = 2  # minimum PHOT population to prevent extinction
-ZOOP_MIN_REQUIRED = 1  # minimum ZOOP population to prevent extinction
-POLY_MIN_REQUIRED = 2  # minimum POLY population to prevent extinction
-MAX_CELLS = 500  # maximum number of cells allowed in simulation
-
-# ── Migration ────────────────────────────────────────────────────
-MIGRATION_CHANCE = 0.0001  # chance per tick to migrate (reduced from 0.0005)
-MIGRATION_DISTANCE = 200.0  # migration jump distance
-
-# ── Decomposition (dead cells) ─────────────────────────────────────
-DECOMPOSITION_NUTRIENT_FRACTION = (
-    0.45  # fraction of max_energy returned as nutrients (was 0.15)
-)
-DECOMPOSITION_TICKS = 300  # visual decay duration of a corpse (ticks)
-CORPSE_EAT_RADIUS = 35.0  # distance for POLY cells to eat a corpse
-CORPSE_EAT_RATE = 0.02  # energy gained per tick while eating
-CORPSE_EAT_EFFICIENCY = 0.8  # energy gained per unit of corpse mass consumed
-CORPSE_ATTRACT_RADIUS = 80.0  # ZOOP scavenging radius (attracted to corpses)
-CORPSE_SCAVENGE_RATE = 0.008  # energy gained per tick for ZOOP scavenging
-CORPSE_NUTRIENT_FIELD_RATE = (
-    0.06  # cluster amount fed into the field per tick
-)
-CORPSE_NUTRIENT_FADE = (
-    0.96  # per-tick fade — faster decay for fewer active clusters
-)
-CORPSE_NUTRIENT_DRAW_MAX = 9.0  # max marker radius drawn for a cluster (was 7)
+      0.98  # increased from 0.96 for faster cluster fade
+  )
+CORPSE_NUTRIENT_DRAW_MAX = 5.0  # reduced from 9.0 to skip tiny clusters
 CORPSE_NUTRIENT_BOOST_RADIUS = 12  # consume-boost radius around a cluster (was 8)
 CORPSE_NUTRIENT_BOOST_MULT = 2.5  # multiplier for boost consumption (was 2.0)
 CORPSE_NUTRIENT_EXTRA_ENERGY = 0.5  # extra energy per boost (was 0.3)
