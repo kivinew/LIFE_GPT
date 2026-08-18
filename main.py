@@ -1028,6 +1028,7 @@ def main():
                         _nma_buf[:n_cells] = [c.genome.mass for c in cells]
                         _nme_buf[:n_cells] = [c.genome.metabolism for c in cells]
                         _nle_buf[:n_cells] = [c.level for c in cells]
+                        _nde_buf[:n_cells] = [c.energy for c in cells]
                         fd = field.data.copy()
                         _old_xs = _nx_buf[:n_cells].copy()
                         _old_ys = _ny_buf[:n_cells].copy()
