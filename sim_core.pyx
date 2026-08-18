@@ -50,6 +50,9 @@ cdef double _COMBAT_DAMAGE_GAIN = 0.8          # config: COMBAT_DAMAGE_GAIN
 cdef double _MASS_DMG_EFFICIENCY = 0.035        # config: MASS_DMG_EFFICIENCY
 cdef double _MIN_MASS_DMG_EFF = 0.45           # config: MIN_MASS_DMG_EFF
 
+cdef double _FEED_RADIUS = 4.0               # config: FEED_RADIUS
+cdef double _FEED_RADIUS_SQ = 16.0           # config: FEED_RADIUS_SQ
+
 cdef int _CELL_SIZE = 16
 cdef int _SB = 600
 cdef int _W = 1600
@@ -129,18 +132,46 @@ def apply_metabolism_and_feeding(
         energies[i] -= metab_cost
 
         # ── Feeding (PHOT / POLY from field) ──
+        # Sample a small area (_FEED_RADIUS) around the cell so food is
+        # actually found at 0.33% field coverage. Single-pixel eating causes
+        # starvation because cells almost never land exactly on a food pixel.
+        # ── Feeding (PHOT / POLY from field) ──
         if diet_arr[i] == _PHOT or diet_arr[i] == _POLY:
             x = int(xs[i])
             y = int(ys[i])
-            if 0 <= x < fw and 0 <= y < fh:
-                eat = min(field_data[x, y], 0.15 * dt)
-                mass_eff = 5.0 / mass_arr[i] if mass_arr[i] > 0 else _MIN_MASS_EFFICIENCY
-                if mass_eff < _MIN_MASS_EFFICIENCY:
-                    mass_eff = _MIN_MASS_EFFICIENCY
-
-                diet_eff = _PHOT_FEED_EFFICIENCY if diet_arr[i] == _PHOT else _POLY_FEED_EFFICIENCY
+            mass_eff = 5.0 / mass_arr[i] if mass_arr[i] > 0 else _MIN_MASS_EFFICIENCY
+            if mass_eff < _MIN_MASS_EFFICIENCY:
+                mass_eff = _MIN_MASS_EFFICIENCY
+            diet_eff = _PHOT_FEED_EFFICIENCY if diet_arr[i] == _PHOT else _POLY_FEED_EFFICIENCY
+            max_eat = 3.0 * dt
+            cx, cy = xs[i], ys[i]
+            r = int(_FEED_RADIUS)
+            x0 = x - r
+            x1 = x + r + 1
+            y0 = y - r
+            y1 = y + r + 1
+            eat = 0.0
+            for px in range(x0, x1):
+                if px < 0 or px >= fw:
+                    continue
+                for py in range(y0, y1):
+                    if py < 0 or py >= fh:
+                        continue
+                    dx = px - cx
+                    dy = py - cy
+                    if dx * dx + dy * dy <= _FEED_RADIUS_SQ:
+                        v = field_data[px, py]
+                        if v > 0.0:
+                            take = min(v, max_eat)
+                            field_data[px, py] = v - take
+                            eat += take
+                            max_eat -= take
+                            if max_eat <= 0.0:
+                                break
+                if max_eat <= 0.0:
+                    break
+            if eat > 0.0:
                 energies[i] += eat * _FEED_EFFICIENCY_BASE * mass_eff * diet_eff
-                field_data[x, y] = max(0.0, field_data[x, y] - eat)
 
         # ── Energy cap ──
         max_e = mass_arr[i] * mass_arr[i] * _ENERGY_MASS_COEFF
@@ -272,9 +303,9 @@ def cy_sense_food(
             else:
                 sense = sense_arr[i]
             best_score = -1.0
-            for j in range(16):
-                ang = <double>rand() / r_max * _PI2
-                dist = <double>rand() / r_max * sense
+            for j in range(64):
+                ang = <double>j / 64.0 * _PI2
+                dist = sense
                 sx = <int>(xs[i] + c_cos(ang) * dist)
                 sy = <int>(ys[i] + c_sin(ang) * dist)
                 if 0 <= sx < fw and 0 <= sy < fh:

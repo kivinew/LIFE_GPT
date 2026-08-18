@@ -56,13 +56,13 @@ class ResourceField:
 
         # Scatter initial food clusters — small clumps so cells can find food
         # (single-pixel dots at 0.33% coverage are never found → starvation)
-        for _ in range(300):
+        for _ in range(1000):
             cx = np.random.randint(0, w)
             cy = np.random.randint(0, h)
-            base_val = np.random.uniform(0.4, 1.0)
-            for _ in range(8):
-                ox = np.random.randint(-2, 3)
-                oy = np.random.randint(-2, 3)
+            base_val = np.random.uniform(0.3, 0.8)
+            for _ in range(12):
+                ox = np.random.randint(-3, 4)
+                oy = np.random.randint(-3, 4)
                 nx, ny = cx + ox, cy + oy
                 if 0 <= nx < w and 0 <= ny < h:
                     self.data[nx, ny] = min(1.0, self.data[nx, ny] + base_val)

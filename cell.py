@@ -82,6 +82,8 @@ from config import (
     DIVIDE_MIN_AGE,
     TEMP_MUT_DEFAULT,
     MOVEMENT_SCALE,
+    FEED_RADIUS,
+    FEED_RADIUS_SQ,
 )
 from spatial import get_neighbors
 from memory import CellMemory
@@ -264,14 +266,15 @@ class Cell:
             fw, fh = W - SB, H
 
             if d in (PHOT, POLY):
-                # Vectorized ray sampling - fewer iterations, more efficient
-                for _ in range(16):  # Reduced from 24
-                    ang = random.random() * math.tau
-                    dist = random.random() * sense
+                # Dense fixed angular scan — deterministic, finds food reliably
+                ray_count = 64
+                for _ in range(ray_count):
+                    ang = (_ / ray_count) * math.tau
+                    dist = sense
                     sx = int(self.x + math.cos(ang) * dist)
                     sy = int(self.y + math.sin(ang) * dist)
                     if 0 <= sx < fw and 0 <= sy < fh:
-                        val = fd[sx][sy]
+                        val = fd[sx, sy]
                         score = val / (1.0 + dist / sense)
                         if score > best_score:
                             best_score = score
@@ -502,7 +505,7 @@ class Cell:
     def feed_phase(self, field, cells, grid, dt):
         d = self.genome.diet
         if d in (PHOT, POLY):
-            eat = field.consume(int(self.x), int(self.y), 0.15 * dt)
+            eat = field.consume_radius(int(self.x), int(self.y), 3.0 * dt, FEED_RADIUS)
             if eat > 0 and self.selected:
                 play_sound("eating")
             # D1: clamp efficiency to reasonable range
