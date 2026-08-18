@@ -20,6 +20,8 @@ from config import (
     FOOD_CLUSTER_RADIUS,
     FOOD_CLUSTER_CHANCE,
     FOOD_HOTSPOT_BOOST,
+    FEED_RADIUS,
+    FEED_RADIUS_SQ,
 )
 
 
@@ -52,11 +54,18 @@ class ResourceField:
         self._last_season_progress = -1.0
         self._field_dirty = True  # Force initial render
 
-        # Scatter initial energy seeds — dense enough for cells to find food
-        for _ in range(3000):
-            self.data[np.random.randint(0, w), np.random.randint(0, h)] = (
-                np.random.uniform(0.4, 1.0)
-            )
+        # Scatter initial food clusters — small clumps so cells can find food
+        # (single-pixel dots at 0.33% coverage are never found → starvation)
+        for _ in range(300):
+            cx = np.random.randint(0, w)
+            cy = np.random.randint(0, h)
+            base_val = np.random.uniform(0.4, 1.0)
+            for _ in range(8):
+                ox = np.random.randint(-2, 3)
+                oy = np.random.randint(-2, 3)
+                nx, ny = cx + ox, cy + oy
+                if 0 <= nx < w and 0 <= ny < h:
+                    self.data[nx, ny] = min(1.0, self.data[nx, ny] + base_val)
 
         # Assign biomes to grid cells
         self._assign_biomes()
@@ -283,6 +292,36 @@ class ResourceField:
                     break
 
         return t * multiplier
+
+    def consume_radius(self, x, y, amt, radius=FEED_RADIUS):
+        """Remove up to `amt` energy from a circular area around (x, y).
+
+        Returns total energy actually consumed (before hotspot/cluster
+        multipliers).  Uses a bounding-box scan clipped to the field for
+        cache-friendly sequential memory access.
+        """
+        r = max(1, int(radius))
+        x0 = max(0, int(x) - r)
+        x1 = min(self.w, int(x) + r + 1)
+        y0 = max(0, int(y) - r)
+        y1 = min(self.h, int(y) + r + 1)
+        cx, cy = float(x), float(y)
+        rs = radius * radius
+        consumed = 0.0
+        for px in range(x0, x1):
+            dx = px - cx
+            for py in range(y0, y1):
+                dy = py - cy
+                if dx * dx + dy * dy <= rs:
+                    v = self.data[px, py]
+                    if v > 0.0:
+                        take = min(v, amt)
+                        self.data[px, py] -= take
+                        amt -= take
+                        consumed += take
+                        if amt <= 0.0:
+                            return consumed
+        return consumed
 
     def draw(self, surf, season="spring", season_progress=0.0, next_season="spring"):
         w, h = self.w, self.h

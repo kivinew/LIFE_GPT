@@ -246,6 +246,13 @@ FOOD_CLUSTER_RADIUS = 18      # max distance from a hotspot for clustered regen
 FOOD_CLUSTER_CHANCE = 0.3     # probability of regen near a hotspot vs random
 FOOD_HOTSPOT_BOOST = 0.05     # extra energy added at hotspot center per regen
 
+# ── Feeding radius ──────────────────────────────────────────────────────────
+# Cells consume food within this pixel radius (not just the single pixel they
+# stand on). 0.33% food coverage with 1px-eating → starvation; ~4px radius
+# gives ~17% effective coverage which yields positive energy balance.
+FEED_RADIUS = 4.0
+FEED_RADIUS_SQ = FEED_RADIUS * FEED_RADIUS
+
 # ── Nutrient clusters (from dead cells) ─────────────────────────────────────
 CORPSE_NUTRIENT_FIELD_RATE = (
     0.06  # cluster amount fed into the field per tick
