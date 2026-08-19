@@ -268,22 +268,31 @@ class Cell:
             fw, fh = W - SB, H
 
             if d in (PHOT, POLY):
-                # Dense angular scan at multiple distances — finds food at any
-                # distance within sense range, not just at the exact endpoint.
-                ray_count = 32
-                for _ in range(ray_count):
-                    ang = (_ / ray_count) * math.tau
-                    for frac in (0.25, 0.5, 0.75):
-                        dist = sense * frac
-                        sx = int(self.x + math.cos(ang) * dist)
-                        sy = int(self.y + math.sin(ang) * dist)
-                        if 0 <= sx < fw and 0 <= sy < fh:
-                            val = fd[sx, sy]
-                            if val > 0.01:
-                                score = val / (1.0 + frac)
-                                if score > best_score:
-                                    best_score = score
-                                    self.best_dir = (math.cos(ang), math.sin(ang))
+                # 64 rays at 3 distances (0.25s, 0.5s, 1.0s) — near/mid/far coverage
+                d0 = sense * 0.25
+                d1 = sense * 0.5
+                d2 = sense
+                for _ in range(64):
+                    ang = (_ / 64.0) * math.tau
+                    cos_ang, sin_ang = math.cos(ang), math.sin(ang)
+                    sx1 = int(self.x + cos_ang * d1)
+                    sy1 = int(self.y + sin_ang * d1)
+                    if 0 <= sx1 < fw and 0 <= sy1 < fh:
+                        val = fd[sx1, sy1]
+                        if val > 0.01:
+                            score = val / 1.5
+                            if score > best_score:
+                                best_score = score
+                                self.best_dir = (cos_ang, sin_ang)
+                    sx2 = int(self.x + cos_ang * d2)
+                    sy2 = int(self.y + sin_ang * d2)
+                    if 0 <= sx2 < fw and 0 <= sy2 < fh:
+                        val = fd[sx2, sy2]
+                        if val > 0.01:
+                            score = val / 2.0
+                            if score > best_score:
+                                best_score = score
+                                self.best_dir = (cos_ang, sin_ang)
 
         if d == PHOT and random.random() < 0.35:
             for j in get_neighbors(grid, self.x, self.y, radius=2):
@@ -1294,20 +1303,32 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False,
                 cx, cy = _xs[i], _ys[i]
                 best_score = -1.0
                 best_ang_x, best_ang_y = _bdx[i], _bdy[i]
-                for _ray in range(32):
-                    ang = (_ray / 32.0) * math.tau
-                    for frac in (0.25, 0.5, 0.75):
-                        dist = sense * frac
-                        sx = int(cx + math.cos(ang) * dist)
-                        sy = int(cy + math.sin(ang) * dist)
-                        if 0 <= sx < field_w and 0 <= sy < H:
-                            val = field.data[sx][sy]
-                            if val > 0.01:
-                                score = val / (1.0 + frac)
-                                if score > best_score:
-                                    best_score = score
-                                    best_ang_x = math.cos(ang)
-                                    best_ang_y = math.sin(ang)
+                # 64 rays at 2 distances (0.5s, 1.0s) — good angular + distance coverage
+                d1 = sense * 0.5
+                d2 = sense
+                for _ray in range(64):
+                    ang = (_ray / 64.0) * math.tau
+                    cos_ang, sin_ang = math.cos(ang), math.sin(ang)
+                    sx1 = int(cx + cos_ang * d1)
+                    sy1 = int(cy + sin_ang * d1)
+                    if 0 <= sx1 < field_w and 0 <= sy1 < H:
+                        val = field.data[sx1][sy1]
+                        if val > 0.01:
+                            score = val / 1.5
+                            if score > best_score:
+                                best_score = score
+                                best_ang_x = cos_ang
+                                best_ang_y = sin_ang
+                    sx2 = int(cx + cos_ang * d2)
+                    sy2 = int(cy + sin_ang * d2)
+                    if 0 <= sx2 < field_w and 0 <= sy2 < H:
+                        val = field.data[sx2][sy2]
+                        if val > 0.01:
+                            score = val / 2.0
+                            if score > best_score:
+                                best_score = score
+                                best_ang_x = cos_ang
+                                best_ang_y = sin_ang
                 if best_score < 0.0:
                     # No food sampled (all empty/uniform): pick a random direction,
                     # not (0,1) downward, to avoid systemic downward drift.
