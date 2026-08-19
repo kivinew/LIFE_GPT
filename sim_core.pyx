@@ -297,47 +297,41 @@ def cy_sense_food(
             best_dy[i] = c_sin(_ang)
 
         # Food ray sampling for PHOT/POLY cells only
+        # Scan all pixels within the sense radius to find the best food direction.
+        # Ray-based sampling misses food between rays; a direct area scan ensures
+        # no food is overlooked within range.
         if diet_arr[i] == _PHOT or diet_arr[i] == _POLY:
             if sense_arr[i] < 8.0:
                 sense = 8.0
             else:
                 sense = sense_arr[i]
             best_score = -1.0
-            for j in range(32):
-                ang = <double>j / 32.0 * _PI2
-                # Sample at multiple distances so food at any distance in the
-                # sense range is detectable — single-distance sampling misses
-                # food that's close but not at the exact ray endpoint.
-                d1 = sense * 0.25
-                d2 = sense * 0.5
-                d3 = sense * 0.75
-                sx1 = <int>(xs[i] + c_cos(ang) * d1)
-                sy1 = <int>(ys[i] + c_sin(ang) * d1)
-                sx2 = <int>(xs[i] + c_cos(ang) * d2)
-                sy2 = <int>(ys[i] + c_sin(ang) * d2)
-                sx3 = <int>(xs[i] + c_cos(ang) * d3)
-                sy3 = <int>(ys[i] + c_sin(ang) * d3)
-                if 0 <= sx1 < fw and 0 <= sy1 < fh:
-                    val = field_data[sx1, sy1]
+            cx = xs[i]
+            cy = ys[i]
+            r = int(sense)
+            x0 = int(cx) - r
+            x1 = int(cx) + r + 1
+            y0 = int(cy) - r
+            y1 = int(cy) + r + 1
+            sq = sense * sense
+            for sx in range(x0, x1):
+                if sx < 0 or sx >= fw:
+                    continue
+                ddx = sx - cx
+                for sy in range(y0, y1):
+                    if sy < 0 or sy >= fh:
+                        continue
+                    ddy = sy - cy
+                    dist_sq = ddx * ddx + ddy * ddy
+                    if dist_sq > sq:
+                        continue
+                    val = field_data[sx, sy]
                     if val > 0.01:
-                        score = val / (1.0 + 0.25)
+                        dist = dist_sq ** 0.5
+                        if dist < 0.01:
+                            dist = 0.01
+                        score = val / (1.0 + dist / sense)
                         if score > best_score:
                             best_score = score
-                            best_dx[i] = c_cos(ang)
-                            best_dy[i] = c_sin(ang)
-                if 0 <= sx2 < fw and 0 <= sy2 < fh:
-                    val = field_data[sx2, sy2]
-                    if val > 0.01:
-                        score = val / (1.0 + 0.5)
-                        if score > best_score:
-                            best_score = score
-                            best_dx[i] = c_cos(ang)
-                            best_dy[i] = c_sin(ang)
-                if 0 <= sx3 < fw and 0 <= sy3 < fh:
-                    val = field_data[sx3, sy3]
-                    if val > 0.01:
-                        score = val / (1.0 + 0.75)
-                        if score > best_score:
-                            best_score = score
-                            best_dx[i] = c_cos(ang)
-                            best_dy[i] = c_sin(ang)
+                            best_dx[i] = ddx / dist
+                            best_dy[i] = ddy / dist
