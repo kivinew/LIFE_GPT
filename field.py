@@ -325,8 +325,8 @@ class ResourceField:
                         if amt <= 0.0:
                             self.mark_dirty()
                             return consumed
-                        self.mark_dirty()
-                        return consumed
+        self.mark_dirty()
+        return consumed
 
     def draw(self, surf, season="spring", season_progress=0.0, next_season="spring"):
         w, h = self.w, self.h
