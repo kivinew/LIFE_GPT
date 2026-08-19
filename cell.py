@@ -275,6 +275,15 @@ class Cell:
                 for _ in range(64):
                     ang = (_ / 64.0) * math.tau
                     cos_ang, sin_ang = math.cos(ang), math.sin(ang)
+                    sx0 = int(self.x + cos_ang * d0)
+                    sy0 = int(self.y + sin_ang * d0)
+                    if 0 <= sx0 < fw and 0 <= sy0 < fh:
+                        val = fd[sx0, sy0]
+                        if val > 0.01:
+                            score = val / 1.25
+                            if score > best_score:
+                                best_score = score
+                                self.best_dir = (cos_ang, sin_ang)
                     sx1 = int(self.x + cos_ang * d1)
                     sy1 = int(self.y + sin_ang * d1)
                     if 0 <= sx1 < fw and 0 <= sy1 < fh:
@@ -1303,12 +1312,25 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False,
                 cx, cy = _xs[i], _ys[i]
                 best_score = -1.0
                 best_ang_x, best_ang_y = _bdx[i], _bdy[i]
-                # 64 rays at 2 distances (0.5s, 1.0s) — good angular + distance coverage
+                # 64 rays at 3 distances (0.25s, 0.5s, 1.0s) — near/mid/far coverage
+                d0 = sense * 0.25
                 d1 = sense * 0.5
                 d2 = sense
                 for _ray in range(64):
                     ang = (_ray / 64.0) * math.tau
                     cos_ang, sin_ang = math.cos(ang), math.sin(ang)
+                    # Near distance
+                    sx0 = int(cx + cos_ang * d0)
+                    sy0 = int(cy + sin_ang * d0)
+                    if 0 <= sx0 < field_w and 0 <= sy0 < H:
+                        val = field.data[sx0][sy0]
+                        if val > 0.01:
+                            score = val / 1.25
+                            if score > best_score:
+                                best_score = score
+                                best_ang_x = cos_ang
+                                best_ang_y = sin_ang
+                    # Mid distance
                     sx1 = int(cx + cos_ang * d1)
                     sy1 = int(cy + sin_ang * d1)
                     if 0 <= sx1 < field_w and 0 <= sy1 < H:
@@ -1319,6 +1341,7 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False,
                                 best_score = score
                                 best_ang_x = cos_ang
                                 best_ang_y = sin_ang
+                    # Far distance
                     sx2 = int(cx + cos_ang * d2)
                     sy2 = int(cy + sin_ang * d2)
                     if 0 <= sx2 < field_w and 0 <= sy2 < H:
