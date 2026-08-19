@@ -261,6 +261,7 @@ class ResourceField:
                 # Preserve precomputed mask/falloff/max_r
                 new_clusters.append([cx, cy, amount] + list(cluster[3:]))
         self.nutrient_clusters = new_clusters
+        self.mark_dirty()  # step() modified self.data — invalidate render cache
 
     def consume(self, x, y, amt):
         """Remove up to `amt` energy from (x, y). Returns energy actually taken."""
@@ -291,7 +292,9 @@ class ResourceField:
                     t += consumed * CORPSE_NUTRIENT_EXTRA_ENERGY
                     break
 
-        return t * multiplier
+        eaten = t * multiplier
+        self.mark_dirty()
+        return eaten
 
     def consume_radius(self, x, y, amt, radius=FEED_RADIUS):
         """Remove up to `amt` energy from a circular area around (x, y).
@@ -320,8 +323,10 @@ class ResourceField:
                         amt -= take
                         consumed += take
                         if amt <= 0.0:
+                            self.mark_dirty()
                             return consumed
-        return consumed
+                        self.mark_dirty()
+                        return consumed
 
     def draw(self, surf, season="spring", season_progress=0.0, next_season="spring"):
         w, h = self.w, self.h

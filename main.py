@@ -1042,6 +1042,7 @@ def main():
                                                      _nme_buf[:n_cells], _nle_buf[:n_cells],
                                                      fd, FIXED_DT)
                         field.data[:] = fd
+                        field.mark_dirty()
 
                         for i, c in enumerate(cells):
                             c.x = float(_nx_buf[i])
