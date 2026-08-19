@@ -303,15 +303,41 @@ def cy_sense_food(
             else:
                 sense = sense_arr[i]
             best_score = -1.0
-            for j in range(64):
-                ang = <double>j / 64.0 * _PI2
-                dist = sense
-                sx = <int>(xs[i] + c_cos(ang) * dist)
-                sy = <int>(ys[i] + c_sin(ang) * dist)
-                if 0 <= sx < fw and 0 <= sy < fh:
-                    val = field_data[sx, sy]
-                    score = val / (1.0 + dist / sense)
-                    if score > best_score:
-                        best_score = score
-                        best_dx[i] = c_cos(ang)
-                        best_dy[i] = c_sin(ang)
+            for j in range(32):
+                ang = <double>j / 32.0 * _PI2
+                # Sample at multiple distances so food at any distance in the
+                # sense range is detectable — single-distance sampling misses
+                # food that's close but not at the exact ray endpoint.
+                d1 = sense * 0.25
+                d2 = sense * 0.5
+                d3 = sense * 0.75
+                sx1 = <int>(xs[i] + c_cos(ang) * d1)
+                sy1 = <int>(ys[i] + c_sin(ang) * d1)
+                sx2 = <int>(xs[i] + c_cos(ang) * d2)
+                sy2 = <int>(ys[i] + c_sin(ang) * d2)
+                sx3 = <int>(xs[i] + c_cos(ang) * d3)
+                sy3 = <int>(ys[i] + c_sin(ang) * d3)
+                if 0 <= sx1 < fw and 0 <= sy1 < fh:
+                    val = field_data[sx1, sy1]
+                    if val > 0.01:
+                        score = val / (1.0 + 0.25)
+                        if score > best_score:
+                            best_score = score
+                            best_dx[i] = c_cos(ang)
+                            best_dy[i] = c_sin(ang)
+                if 0 <= sx2 < fw and 0 <= sy2 < fh:
+                    val = field_data[sx2, sy2]
+                    if val > 0.01:
+                        score = val / (1.0 + 0.5)
+                        if score > best_score:
+                            best_score = score
+                            best_dx[i] = c_cos(ang)
+                            best_dy[i] = c_sin(ang)
+                if 0 <= sx3 < fw and 0 <= sy3 < fh:
+                    val = field_data[sx3, sy3]
+                    if val > 0.01:
+                        score = val / (1.0 + 0.75)
+                        if score > best_score:
+                            best_score = score
+                            best_dx[i] = c_cos(ang)
+                            best_dy[i] = c_sin(ang)

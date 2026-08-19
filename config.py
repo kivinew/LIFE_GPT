@@ -80,9 +80,10 @@ DISEASE_DURATION = 500
 DISEASE_METABOLISM_MULT = 2.0
 DISEASE_TRANSMISSION_RANGE = 50.0
 
-# Migration
-MIGRATION_CHANCE = 0.001
-MIGRATION_DISTANCE = 30.0
+# Migration (gradual relocation when starving — not a teleport)
+MIGRATION_CHANCE = 0.0005
+MIGRATION_DISTANCE = 12.0
+MIGRATION_COOLDOWN = 500   # ticks between migration attempts per cell
 
 # Temperature
 TEMP_ENERGY_PENALTY = 0.02

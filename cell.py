@@ -84,6 +84,7 @@ from config import (
     MOVEMENT_SCALE,
     FEED_RADIUS,
     FEED_RADIUS_SQ,
+    MIGRATION_COOLDOWN,
 )
 from spatial import get_neighbors
 from memory import CellMemory
@@ -217,6 +218,7 @@ class Cell:
         self.chase_timer = 0
         self.sick = False
         self.sick_timer = 0
+        self._migration_cooldown = 0
 
         # Viral infection support
         self.infected = False
@@ -266,19 +268,22 @@ class Cell:
             fw, fh = W - SB, H
 
             if d in (PHOT, POLY):
-                # Dense fixed angular scan — deterministic, finds food reliably
-                ray_count = 64
+                # Dense angular scan at multiple distances — finds food at any
+                # distance within sense range, not just at the exact endpoint.
+                ray_count = 32
                 for _ in range(ray_count):
                     ang = (_ / ray_count) * math.tau
-                    dist = sense
-                    sx = int(self.x + math.cos(ang) * dist)
-                    sy = int(self.y + math.sin(ang) * dist)
-                    if 0 <= sx < fw and 0 <= sy < fh:
-                        val = fd[sx, sy]
-                        score = val / (1.0 + dist / sense)
-                        if score > best_score:
-                            best_score = score
-                            self.best_dir = (math.cos(ang), math.sin(ang))
+                    for frac in (0.25, 0.5, 0.75):
+                        dist = sense * frac
+                        sx = int(self.x + math.cos(ang) * dist)
+                        sy = int(self.y + math.sin(ang) * dist)
+                        if 0 <= sx < fw and 0 <= sy < fh:
+                            val = fd[sx, sy]
+                            if val > 0.01:
+                                score = val / (1.0 + frac)
+                                if score > best_score:
+                                    best_score = score
+                                    self.best_dir = (math.cos(ang), math.sin(ang))
 
         if d == PHOT and random.random() < 0.35:
             for j in get_neighbors(grid, self.x, self.y, radius=2):
@@ -871,6 +876,9 @@ class Cell:
 
     # ── Phase 13: migration ──
     def migration_phase(self):
+        if self._migration_cooldown > 0:
+            self._migration_cooldown -= 1
+            return
         if random.random() < MIGRATION_CHANCE:
             if self.energy < self.max_energy * 0.3:  # only hungry cells migrate
                 angle = random.random() * math.tau
@@ -880,6 +888,7 @@ class Cell:
                 # Stay within bounds
                 self.x = max(0, min(W - SB - 1, new_x))
                 self.y = max(0, min(H - 1, new_y))
+                self._migration_cooldown = MIGRATION_COOLDOWN
 
     # ── Phase 14: temperature ──
     def temperature_phase(self, field, dt):
@@ -1285,18 +1294,20 @@ def vectorized_sensory_phase(cells, grid, field, dt, skip_food_ray=False,
                 cx, cy = _xs[i], _ys[i]
                 best_score = -1.0
                 best_ang_x, best_ang_y = _bdx[i], _bdy[i]
-                for _ray in range(16):
-                    ang = random.random() * math.tau
-                    dist = random.random() * sense
-                    sx = int(cx + math.cos(ang) * dist)
-                    sy = int(cy + math.sin(ang) * dist)
-                    if 0 <= sx < field_w and 0 <= sy < H:
-                        val = field.data[sx][sy]
-                        score = val / (1.0 + dist / sense)
-                        if score > best_score:
-                            best_score = score
-                            best_ang_x = math.cos(ang)
-                            best_ang_y = math.sin(ang)
+                for _ray in range(32):
+                    ang = (_ray / 32.0) * math.tau
+                    for frac in (0.25, 0.5, 0.75):
+                        dist = sense * frac
+                        sx = int(cx + math.cos(ang) * dist)
+                        sy = int(cy + math.sin(ang) * dist)
+                        if 0 <= sx < field_w and 0 <= sy < H:
+                            val = field.data[sx][sy]
+                            if val > 0.01:
+                                score = val / (1.0 + frac)
+                                if score > best_score:
+                                    best_score = score
+                                    best_ang_x = math.cos(ang)
+                                    best_ang_y = math.sin(ang)
                 if best_score < 0.0:
                     # No food sampled (all empty/uniform): pick a random direction,
                     # not (0,1) downward, to avoid systemic downward drift.
