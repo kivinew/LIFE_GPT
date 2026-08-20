@@ -51,7 +51,7 @@ BASE_METABOLISM_MULT = 1.0
 PREDATOR_METABOLISM_MULT = 0.55  # Was 0.75 — reduced to help ZOOP survive longer
 SPEED_COST = 0.05
 MASS_PENALTY = 0.003
-FEED_EFFICIENCY_BASE = 22.0   # Ensure cells feed regularly
+FEED_EFFICIENCY_BASE = 22.0   # good feed gain
 PHOT_FEED_EFFICIENCY = 1.0
 POLY_FEED_EFFICIENCY = 0.7
 MIN_MASS_EFFICIENCY = 0.55
@@ -63,9 +63,9 @@ MASS_DMG_EFFICIENCY = 0.035
 MIN_MASS_DMG_EFF = 0.45
 
 # ── Level system ─────────────────────────────────────────────────
-LEVEL_UP_THRESHOLD = 0.60  # Faster leveling
+LEVEL_UP_THRESHOLD = 0.85  # high — cells need nearly full energy to level up
 # ── Division conditions ─────────────────────────────────────
-DIVIDE_ENERGY_RATIO = 0.70  # Energy must be 70% of max to divide
+DIVIDE_ENERGY_RATIO = 0.65
 DIVIDE_MIN_AGE = 100
 LEVEL_DOWN_THRESHOLD = 0.25   # Was 3.0 — lose level at 25% energy
 MAX_LEVEL = 10
@@ -102,8 +102,8 @@ DIET_DEFAULT_SPEED = {0: 0.5, 1: 4.0, 2: 2.0}
 DIET_DEFAULT_SENSE = {0: 30.0, 1: 120.0, 2: 65.0}
 
 # Division
-DIVIDE_ENERGY_RATIO = 0.85
-DIVIDE_MIN_AGE = 400
+DIVIDE_ENERGY_RATIO = 0.65
+DIVIDE_MIN_AGE = 100
 
 # Temp mutation
 TEMP_MUT_DEFAULT = 0.5
@@ -242,7 +242,7 @@ SEASON_FOOD_COLORS = {
 FOOD_DECAY_RATE = 0.001    # fraction lost per tick (~50% in 693 ticks)
 
 # ── Food generation ─────────────────────────────────────────────────────────
-FOOD_REGEN_SPREAD = 500       # Was 200 — more pixels get regen per tick
+FOOD_REGEN_SPREAD = 1000
 FOOD_CLUSTER_RADIUS = 18      # max distance from a hotspot for clustered regen
 FOOD_CLUSTER_CHANCE = 0.3     # probability of regen near a hotspot vs random
 FOOD_HOTSPOT_BOOST = 0.05     # extra energy added at hotspot center per regen

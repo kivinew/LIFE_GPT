@@ -528,7 +528,7 @@ class Cell:
     def feed_phase(self, field, cells, grid, dt):
         d = self.genome.diet
         if d in (PHOT, POLY):
-            eat = field.consume_radius(int(self.x), int(self.y), 20.0 * dt, FEED_RADIUS)
+            eat = field.consume_radius(int(self.x), int(self.y), 3.0 * dt, FEED_RADIUS)
             if eat > 0 and self.selected:
                 play_sound("eating")
             # D1: clamp efficiency to reasonable range
@@ -1042,9 +1042,9 @@ class Cell:
 
     def can_divide(self):
         """Check if cell can divide based on energy and age."""
-        if self.energy < self.max_energy * DIVIDE_ENERGY_RATIO:
-            return False
         if self.age < DIVIDE_MIN_AGE:
+            return False
+        if self.energy < self.max_energy * DIVIDE_ENERGY_RATIO:
             return False
         return True
 
