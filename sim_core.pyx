@@ -39,8 +39,8 @@ cdef double _LEVEL_MASS_STEP = 0.6            # config: LEVEL_MASS_STEP
 cdef double _BASE_METABOLISM_MULT = 1.0       # config: BASE_METABOLISM_MULT
 cdef double _PREDATOR_METABOLISM_MULT = 0.55  # config: PREDATOR_METABOLISM_MULT
 cdef double _SPEED_COST = 0.05                 # config: SPEED_COST
-cdef double _MASS_PENALTY = 0.0028             # config: MASS_PENALTY
-cdef double _FEED_EFFICIENCY_BASE = 22.0       # config: FEED_EFFICIENCY_BASE (was 18.0)
+cdef double _MASS_PENALTY = 0.003             # config: MASS_PENALTY
+cdef double _FEED_EFFICIENCY_BASE = 22.0       # config: FEED_EFFICIENCY_BASE
 cdef double _PHOT_FEED_EFFICIENCY = 1.0        # config: PHOT_FEED_EFFICIENCY
 cdef double _POLY_FEED_EFFICIENCY = 0.7        # config: POLY_FEED_EFFICIENCY
 cdef double _MIN_MASS = 1.0                     # config: minimum cell mass
@@ -143,7 +143,7 @@ def apply_metabolism_and_feeding(
             if mass_eff < _MIN_MASS_EFFICIENCY:
                 mass_eff = _MIN_MASS_EFFICIENCY
             diet_eff = _PHOT_FEED_EFFICIENCY if diet_arr[i] == _PHOT else _POLY_FEED_EFFICIENCY
-            max_eat = 3.0 * dt
+            max_eat = 20.0 * dt  # aggressive feeding
             cx, cy = xs[i], ys[i]
             r = int(_FEED_RADIUS)
             x0 = x - r

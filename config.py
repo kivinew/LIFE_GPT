@@ -49,11 +49,11 @@ REGEN_SMOOTH_RATE = 0.03  # base_regen moves toward target by this fraction per 
 # ── Metabolism ───────────────────────────────────────────────────
 BASE_METABOLISM_MULT = 1.0
 PREDATOR_METABOLISM_MULT = 0.55  # Was 0.75 — reduced to help ZOOP survive longer
-SPEED_COST = 0.08          # Was 0.05 — higher cost for speed
-MASS_PENALTY = 0.005       # Was 0.0028 — higher mass penalty
-FEED_EFFICIENCY_BASE = 15.0   # Was 22.0 — lower gain from food
-PHOT_FEED_EFFICIENCY = 0.8    # Was 1.0
-POLY_FEED_EFFICIENCY = 0.6    # Was 0.7
+SPEED_COST = 0.05
+MASS_PENALTY = 0.003
+FEED_EFFICIENCY_BASE = 22.0   # Ensure cells feed regularly
+PHOT_FEED_EFFICIENCY = 1.0
+POLY_FEED_EFFICIENCY = 0.7
 MIN_MASS_EFFICIENCY = 0.55
 
 # ── Combat ───────────────────────────────────────────────────────
@@ -63,10 +63,10 @@ MASS_DMG_EFFICIENCY = 0.035
 MIN_MASS_DMG_EFF = 0.45
 
 # ── Level system ─────────────────────────────────────────────────
-LEVEL_UP_THRESHOLD = 0.75     # Was 0.60 — harder to level up
+LEVEL_UP_THRESHOLD = 0.60  # Faster leveling
 # ── Division conditions ─────────────────────────────────────
-DIVIDE_ENERGY_RATIO = 0.85    # Was 0.70 — need 85% energy to divide
-DIVIDE_MIN_AGE = 400          # Was 200 — older before dividing
+DIVIDE_ENERGY_RATIO = 0.70  # Energy must be 70% of max to divide
+DIVIDE_MIN_AGE = 100
 LEVEL_DOWN_THRESHOLD = 0.25   # Was 3.0 — lose level at 25% energy
 MAX_LEVEL = 10
 LEVEL_MASS_BASE = 2.0
@@ -242,7 +242,7 @@ SEASON_FOOD_COLORS = {
 FOOD_DECAY_RATE = 0.001    # fraction lost per tick (~50% in 693 ticks)
 
 # ── Food generation ─────────────────────────────────────────────────────────
-FOOD_REGEN_SPREAD = 200       # cells boosted per tick (was 200)
+FOOD_REGEN_SPREAD = 500       # Was 200 — more pixels get regen per tick
 FOOD_CLUSTER_RADIUS = 18      # max distance from a hotspot for clustered regen
 FOOD_CLUSTER_CHANCE = 0.3     # probability of regen near a hotspot vs random
 FOOD_HOTSPOT_BOOST = 0.05     # extra energy added at hotspot center per regen

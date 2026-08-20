@@ -528,7 +528,7 @@ class Cell:
     def feed_phase(self, field, cells, grid, dt):
         d = self.genome.diet
         if d in (PHOT, POLY):
-            eat = field.consume_radius(int(self.x), int(self.y), 3.0 * dt, FEED_RADIUS)
+            eat = field.consume_radius(int(self.x), int(self.y), 20.0 * dt, FEED_RADIUS)
             if eat > 0 and self.selected:
                 play_sound("eating")
             # D1: clamp efficiency to reasonable range
@@ -1097,7 +1097,7 @@ class Cell:
             self.energy = parent_e
 
         # Removed mass-based abort chance
-        if self.energy <= LEVEL_DOWN_THRESHOLD and self.level > 0:
+        if self.energy <= self.max_energy * LEVEL_DOWN_THRESHOLD and self.level > 0:
             self.level -= 1
         play_sound("divide")
         global divisions

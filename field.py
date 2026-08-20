@@ -29,7 +29,7 @@ class ResourceField:
     def __init__(self, w: int, h: int):
         self.w, self.h = w, h
         self.regen: float = 0.06
-        self.base_regen: float = 0.06
+        self.base_regen: float = 0.15  # Was 0.06 — higher regen for sustainable population
         self.diff: float = 0.06
         self.temperature: float = 0.7  # Global temperature (0.0-1.0)
         self.zoophagy_mult: float = 1.0  # Predator feeding efficiency multiplier
@@ -56,13 +56,13 @@ class ResourceField:
 
         # Scatter initial food clusters — small clumps so cells can find food
         # (single-pixel dots at 0.33% coverage are never found → starvation)
-        for _ in range(1000):
+        for _ in range(2000):
             cx = np.random.randint(0, w)
             cy = np.random.randint(0, h)
             base_val = np.random.uniform(0.3, 0.8)
-            for _ in range(12):
-                ox = np.random.randint(-3, 4)
-                oy = np.random.randint(-3, 4)
+            for _ in range(20):
+                ox = np.random.randint(-4, 5)
+                oy = np.random.randint(-4, 5)
                 nx, ny = cx + ox, cy + oy
                 if 0 <= nx < w and 0 <= ny < h:
                     self.data[nx, ny] = min(1.0, self.data[nx, ny] + base_val)
