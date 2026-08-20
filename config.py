@@ -49,11 +49,11 @@ REGEN_SMOOTH_RATE = 0.03  # base_regen moves toward target by this fraction per 
 # ── Metabolism ───────────────────────────────────────────────────
 BASE_METABOLISM_MULT = 1.0
 PREDATOR_METABOLISM_MULT = 0.55  # Was 0.75 — reduced to help ZOOP survive longer
-SPEED_COST = 0.05
-MASS_PENALTY = 0.0028
-FEED_EFFICIENCY_BASE = 22.0  # Increased to ensure cells feed regularly and sounds play
-PHOT_FEED_EFFICIENCY = 1.0  # Reduced from 1.2 to slow PHOT division
-POLY_FEED_EFFICIENCY = 0.7  # Reduced from 0.95 to balance POLY feeding
+SPEED_COST = 0.08          # Was 0.05 — higher cost for speed
+MASS_PENALTY = 0.005       # Was 0.0028 — higher mass penalty
+FEED_EFFICIENCY_BASE = 15.0   # Was 22.0 — lower gain from food
+PHOT_FEED_EFFICIENCY = 0.8    # Was 1.0
+POLY_FEED_EFFICIENCY = 0.6    # Was 0.7
 MIN_MASS_EFFICIENCY = 0.55
 
 # ── Combat ───────────────────────────────────────────────────────
@@ -63,11 +63,11 @@ MASS_DMG_EFFICIENCY = 0.035
 MIN_MASS_DMG_EFF = 0.45
 
 # ── Level system ─────────────────────────────────────────────────
-LEVEL_UP_THRESHOLD = 0.60  # Was 0.50 — increased to slow PHOT leveling
+LEVEL_UP_THRESHOLD = 0.75     # Was 0.60 — harder to level up
 # ── Division conditions ─────────────────────────────────────
-DIVIDE_ENERGY_RATIO = 0.70  # Energy must be 95% of max to divide
-DIVIDE_MIN_AGE = 200  # Minimum age before cell can divide
-LEVEL_DOWN_THRESHOLD = 3.0
+DIVIDE_ENERGY_RATIO = 0.85    # Was 0.70 — need 85% energy to divide
+DIVIDE_MIN_AGE = 400          # Was 200 — older before dividing
+LEVEL_DOWN_THRESHOLD = 0.25   # Was 3.0 — lose level at 25% energy
 MAX_LEVEL = 10
 LEVEL_MASS_BASE = 2.0
 LEVEL_MASS_STEP = 0.6
@@ -102,8 +102,8 @@ DIET_DEFAULT_SPEED = {0: 0.5, 1: 4.0, 2: 2.0}
 DIET_DEFAULT_SENSE = {0: 30.0, 1: 120.0, 2: 65.0}
 
 # Division
-DIVIDE_ENERGY_RATIO = 0.70
-DIVIDE_MIN_AGE = 200
+DIVIDE_ENERGY_RATIO = 0.85
+DIVIDE_MIN_AGE = 400
 
 # Temp mutation
 TEMP_MUT_DEFAULT = 0.5
