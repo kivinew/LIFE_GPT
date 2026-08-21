@@ -163,7 +163,7 @@ class Genome:
         # sink — cycles can still complete.
         _DIET_TRANS_WEIGHTS = {
             (PHOT, POLY): 0.3,  # phot -> poly: favored
-            (PHOT, ZOOP): 0.1,  # phot -> zoop: rarer
+            (PHOT, ZOOP): 0.3,  # phot -> zoop: same as poly
             (POLY, ZOOP): 0.3,  # poly -> zoop: favored
             (POLY, PHOT): 0.1,  # poly -> phot: rarer
             (ZOOP, POLY): 0.3,  # zoop -> poly: favored

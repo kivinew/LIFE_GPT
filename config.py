@@ -49,7 +49,7 @@ REGEN_SMOOTH_RATE = 0.03  # base_regen moves toward target by this fraction per 
 # ── Metabolism ───────────────────────────────────────────────────
 BASE_METABOLISM_MULT = 1.0
 PREDATOR_METABOLISM_MULT = 0.55  # Was 0.75 — reduced to help ZOOP survive longer
-SPEED_COST = 0.05
+SPEED_COST = 0.03
 MASS_PENALTY = 0.003
 FEED_EFFICIENCY_BASE = 20.0   # slightly lower feed gain
 PHOT_FEED_EFFICIENCY = 1.0
@@ -98,8 +98,8 @@ MAJOR_DIET_RATE = 0.5
 MAJOR_SENSE_RATE = 0.5
 
 # Diet defaults
-DIET_DEFAULT_SPEED = {0: 0.5, 1: 4.0, 2: 2.0}
-DIET_DEFAULT_SENSE = {0: 30.0, 1: 120.0, 2: 65.0}
+DIET_DEFAULT_SPEED = {0: 1.0, 1: 3.0, 2: 2.0}  # ZOOP slower (less metab cost)
+DIET_DEFAULT_SENSE = {0: 50.0, 1: 120.0, 2: 65.0}  # PHOT higher sense (was 30)
 
 # Division
 DIVIDE_ENERGY_RATIO = 0.80

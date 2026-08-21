@@ -536,24 +536,25 @@ class Cell:
             diet_eff = PHOT_FEED_EFFICIENCY if d == PHOT else POLY_FEED_EFFICIENCY
             self.energy += eat * FEED_EFFICIENCY_BASE * mass_eff * diet_eff
         elif d == ZOOP or d == POLY:
-            # Zoophagy: gain energy from consuming phototrophs
-            sense = max(8.0, self.genome.sense)
-            zoophagy_mult = field.zoophagy_mult if field else 1.0
-            for j in get_neighbors(grid, self.x, self.y, radius=1):
-                other = cells[j]
-                if (
-                    other is not self
-                    and other.energy > 0
-                    and other.genome.diet == PHOT
-                    and other.cls != self.cls
-                ):
-                    dx = other.x - self.x
-                    dy = other.y - self.y
-                    if dx * dx + dy * dy <= sense * sense:
-                        # Gain energy from prey (parasitic feeding)
-                        feed_gain = min(2.0, other.energy * 0.08 * zoophagy_mult)
-                        self.energy += feed_gain * COMBAT_DAMAGE_GAIN
-                        break
+                    # Zoophagy: gain energy from consuming phototrophs
+                    sense = max(8.0, self.genome.sense)
+                    zoophagy_mult = field.zoophagy_mult if field else 1.0
+                    for j in get_neighbors(grid, self.x, self.y, radius=1):
+                        other = cells[j]
+                        if (
+                            other is not self
+                            and other.energy > 0
+                            and other.genome.diet == PHOT
+                            and other.cls != self.cls
+                        ):
+                            dx = other.x - self.x
+                            dy = other.y - self.y
+                            if dx * dx + dy * dy <= sense * sense:
+                                # Parasitic feeding: ZOOP drains energy from PHOT
+                                                                # Restored gain for ZOOP survival
+                                                                feed_gain = min(2.5, other.energy * 0.1 * zoophagy_mult)  # was 1.5/0.06
+                                                                self.energy += feed_gain * COMBAT_DAMAGE_GAIN
+                                                                break
 
     # ── Phase 6: combat ──
     def combat_phase(self, cells, grid, pack_decision, dt, field=None, attackers=None):
@@ -648,15 +649,15 @@ class Cell:
                         self.memory.record_threat(enemy_cls, magnitude=0.5)
 
                     if my_diet in (ZOOP, POLY):
-                        mass_eff = max(
-                            MIN_MASS_DMG_EFF,
-                            1.0 - (my_mass - 4.0) * MASS_DMG_EFFICIENCY,
-                        )
-                        if my_diet == ZOOP:
-                            de = PHOT_FEED_EFFICIENCY * zoophagy
-                        else:
-                            de = POLY_FEED_EFFICIENCY
-                        self.energy += amount * COMBAT_DAMAGE_GAIN * mass_eff * de
+                                            mass_eff = max(
+                                                MIN_MASS_DMG_EFF,
+                                                1.0 - (my_mass - 4.0) * MASS_DMG_EFFICIENCY,
+                                            )
+                                            if my_diet == ZOOP:
+                                                de = PHOT_FEED_EFFICIENCY * zoophagy * 1.0  # full combat gain for ZOOP survival
+                                            else:
+                                                de = POLY_FEED_EFFICIENCY
+                                            self.energy += amount * COMBAT_DAMAGE_GAIN * mass_eff * de
 
     # ── Phase 7: metabolism ──
     def metabolism_phase(self, dt, temperature=0.7):
