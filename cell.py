@@ -528,7 +528,7 @@ class Cell:
     def feed_phase(self, field, cells, grid, dt):
         d = self.genome.diet
         if d in (PHOT, POLY):
-            eat = field.consume_radius(int(self.x), int(self.y), 3.0 * dt, FEED_RADIUS)
+            eat = field.consume_radius(int(self.x), int(self.y), 10.0 * dt, FEED_RADIUS)
             if eat > 0 and self.selected:
                 play_sound("eating")
             # D1: clamp efficiency to reasonable range

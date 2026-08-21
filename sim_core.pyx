@@ -143,7 +143,7 @@ def apply_metabolism_and_feeding(
             if mass_eff < _MIN_MASS_EFFICIENCY:
                 mass_eff = _MIN_MASS_EFFICIENCY
             diet_eff = _PHOT_FEED_EFFICIENCY if diet_arr[i] == _PHOT else _POLY_FEED_EFFICIENCY
-            max_eat = 3.0 * dt
+            max_eat = 10.0 * dt
             cx, cy = xs[i], ys[i]
             r = int(_FEED_RADIUS)
             x0 = x - r

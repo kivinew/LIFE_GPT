@@ -29,7 +29,7 @@ class ResourceField:
     def __init__(self, w: int, h: int):
         self.w, self.h = w, h
         self.regen: float = 0.06
-        self.base_regen: float = 0.8  # high regen for sustainable growth
+        self.base_regen: float = 2.0  # high regen for sustainable growth
         self.diff: float = 0.06
         self.temperature: float = 0.7  # Global temperature (0.0-1.0)
         self.zoophagy_mult: float = 1.0  # Predator feeding efficiency multiplier
@@ -59,7 +59,7 @@ class ResourceField:
         for _ in range(3000):
             cx = np.random.randint(0, w)
             cy = np.random.randint(0, h)
-            base_val = np.random.uniform(0.3, 0.8)
+            base_val = np.random.uniform(0.5, 1.0)  # higher food value
             for _ in range(20):
                 ox = np.random.randint(-4, 5)
                 oy = np.random.randint(-4, 5)
