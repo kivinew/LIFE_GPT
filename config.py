@@ -51,7 +51,7 @@ BASE_METABOLISM_MULT = 1.0
 PREDATOR_METABOLISM_MULT = 0.55  # Was 0.75 — reduced to help ZOOP survive longer
 SPEED_COST = 0.05
 MASS_PENALTY = 0.003
-FEED_EFFICIENCY_BASE = 22.0   # good feed gain
+FEED_EFFICIENCY_BASE = 20.0   # slightly lower feed gain
 PHOT_FEED_EFFICIENCY = 1.0
 POLY_FEED_EFFICIENCY = 0.7
 MIN_MASS_EFFICIENCY = 0.55
@@ -65,8 +65,8 @@ MIN_MASS_DMG_EFF = 0.45
 # ── Level system ─────────────────────────────────────────────────
 LEVEL_UP_THRESHOLD = 0.85  # high — cells need nearly full energy to level up
 # ── Division conditions ─────────────────────────────────────
-DIVIDE_ENERGY_RATIO = 0.65
-DIVIDE_MIN_AGE = 100
+DIVIDE_ENERGY_RATIO = 0.80  # Energy must be 80% of max to divide
+DIVIDE_MIN_AGE = 250        # Older cells can divide
 LEVEL_DOWN_THRESHOLD = 0.25   # Was 3.0 — lose level at 25% energy
 MAX_LEVEL = 10
 LEVEL_MASS_BASE = 2.0
@@ -102,8 +102,8 @@ DIET_DEFAULT_SPEED = {0: 0.5, 1: 4.0, 2: 2.0}
 DIET_DEFAULT_SENSE = {0: 30.0, 1: 120.0, 2: 65.0}
 
 # Division
-DIVIDE_ENERGY_RATIO = 0.65
-DIVIDE_MIN_AGE = 100
+DIVIDE_ENERGY_RATIO = 0.80
+DIVIDE_MIN_AGE = 250
 
 # Temp mutation
 TEMP_MUT_DEFAULT = 0.5
