@@ -63,20 +63,33 @@ MASS_DMG_EFFICIENCY = 0.035
 MIN_MASS_DMG_EFF = 0.45
 
 # ── Level system ─────────────────────────────────────────────────
-LEVEL_UP_THRESHOLD = 0.85  # high — cells need nearly full energy to level up
-# ── Division conditions ─────────────────────────────────────
-DIVIDE_ENERGY_RATIO = 0.80  # Energy must be 80% of max to divide
-DIVIDE_MIN_AGE = 250        # Older cells can divide
 LEVEL_DOWN_THRESHOLD = 0.25   # Was 3.0 — lose level at 25% energy
-MAX_LEVEL = 10
+MAX_LEVEL = 20
 LEVEL_MASS_BASE = 2.0
 LEVEL_MASS_STEP = 0.6
 # Experience system
-EXP_PER_INTERACTION = 2.0   # EXP gained per social interaction
-EXP_PER_KILL = 5.0          # EXP gained per kill
-EXP_PER_COOP = 3.0          # EXP gained per cooperation event
-EXP_PER_LEVEL = 10.0        # EXP needed to level up (linear scaling)
+EXP_PER_INTERACTION = 1.0    # per social interaction
+EXP_PER_KILL = 5.0           # per kill
+EXP_PER_COOP = 2.0           # per cooperation event
+EXP_PER_FEED = 0.5           # per unit of food eaten
+EXP_PER_FEEDING = 1.0        # per parasitic feeding
+EXP_PER_LEVEL_BASE = 10.0    # base EXP for level 1
+EXP_PER_LEVEL_MULT = 1.5     # exponential scaling per level
+MAX_LEVEL = 20
+# Level bonuses (per level)
+LEVEL_SPEED_BONUS = 0.03     # +3% speed per level
+LEVEL_SENSE_BONUS = 0.03     # +3% sense per level
+LEVEL_DAMAGE_BONUS = 0.05    # +5% damage per level
+LEVEL_METAB_BONUS = 0.02     # -2% metabolism cost per level
+# Mass growth from energy surplus
 MASS_GROWTH_ENERGY_RATIO = 0.98  # 98% of max energy → grow mass
+MASS_GROWTH_RATE = 0.005         # 0.5% mass per tick at full energy
+MAX_MASS = 8.0
+# Division conditions
+DIVIDE_ENERGY_RATIO = 0.70
+DIVIDE_MIN_AGE = 150
+DIVIDE_CHANCE_BASE = 0.25     # 25% chance per tick when ready
+DIVIDE_MIN_LEVEL = 2          # min level to divide
 
 # ── Lifespan / aging ─────────────────────────────────────────────
 
@@ -104,12 +117,12 @@ MAJOR_DIET_RATE = 0.5
 MAJOR_SENSE_RATE = 0.5
 
 # Diet defaults
-DIET_DEFAULT_SPEED = {0: 1.0, 1: 3.0, 2: 2.0}  # ZOOP slower (less metab cost)
-DIET_DEFAULT_SENSE = {0: 50.0, 1: 120.0, 2: 65.0}  # PHOT higher sense (was 30)
+DIET_DEFAULT_SPEED = {PHOT: 1.0, ZOOP: 3.0, POLY: 2.0}
+DIET_DEFAULT_SENSE = {PHOT: 50.0, ZOOP: 120.0, POLY: 65.0}
 
 # Division
-DIVIDE_ENERGY_RATIO = 0.80
-DIVIDE_MIN_AGE = 250
+DIVIDE_ENERGY_RATIO = 0.70
+DIVIDE_MIN_AGE = 150
 
 # Temp mutation
 TEMP_MUT_DEFAULT = 0.5

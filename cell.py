@@ -38,11 +38,28 @@ from config import (
     COMBAT_DAMAGE_GAIN,
     MASS_DMG_EFFICIENCY,
     MIN_MASS_DMG_EFF,
-    LEVEL_UP_THRESHOLD,
     LEVEL_DOWN_THRESHOLD,
     MAX_LEVEL,
     LEVEL_MASS_BASE,
     LEVEL_MASS_STEP,
+    EXP_PER_INTERACTION,
+    EXP_PER_KILL,
+    EXP_PER_COOP,
+    EXP_PER_FEED,
+    EXP_PER_FEEDING,
+    EXP_PER_LEVEL_BASE,
+    EXP_PER_LEVEL_MULT,
+    LEVEL_SPEED_BONUS,
+    LEVEL_SENSE_BONUS,
+    LEVEL_DAMAGE_BONUS,
+    LEVEL_METAB_BONUS,
+    MASS_GROWTH_ENERGY_RATIO,
+    MASS_GROWTH_RATE,
+    MAX_MASS,
+    DIVIDE_ENERGY_RATIO,
+    DIVIDE_MIN_AGE,
+    DIVIDE_CHANCE_BASE,
+    DIVIDE_MIN_LEVEL,
     AGGRO_INTERACT_THRESHOLD,
     COOP_INTERACT_THRESHOLD,
     AGGRO_STEAL_FRACTION,
@@ -62,8 +79,21 @@ from config import (
     EXP_PER_INTERACTION,
     EXP_PER_KILL,
     EXP_PER_COOP,
-    EXP_PER_LEVEL,
+    EXP_PER_FEED,
+    EXP_PER_FEEDING,
+    EXP_PER_LEVEL_BASE,
+    EXP_PER_LEVEL_MULT,
+    LEVEL_SPEED_BONUS,
+    LEVEL_SENSE_BONUS,
+    LEVEL_DAMAGE_BONUS,
+    LEVEL_METAB_BONUS,
     MASS_GROWTH_ENERGY_RATIO,
+    MASS_GROWTH_RATE,
+    MAX_MASS,
+    DIVIDE_ENERGY_RATIO,
+    DIVIDE_MIN_AGE,
+    DIVIDE_CHANCE_BASE,
+    DIVIDE_MIN_LEVEL,
     YEL,
     WHITE,
     CYAN,
@@ -725,37 +755,42 @@ class Cell:
     def level_phase(self):
         """Level system: mass grows from energy surplus, levels from experience.
 
-        - 100% energy → grows MASS (biomass accumulation, not level)
+        - 98%+ energy → grows MASS (biomass accumulation)
         - EXP from social interactions → grows LEVEL (combat/cooperation bonus)
+        - Level gives bonuses: speed, sense, damage, metabolism reduction
         """
         max_e = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
         old_level = self.level
-        old_mass = self.genome.mass
 
-        # Mass growth: when at full energy, convert excess to mass
+        # Compute energy ratio
         energy_ratio = self.energy / max_e if max_e > 0 else 0.0
-        if energy_ratio >= MASS_GROWTH_ENERGY_RATIO and self.genome.mass < 8.0:
-            new_mass = min(8.0, self.genome.mass * 1.02)  # 2% mass growth per tick at full energy
+
+        # 1) MASS GROWTH: when at high energy, convert excess to mass (biomass)
+        if energy_ratio >= MASS_GROWTH_ENERGY_RATIO and self.genome.mass < MAX_MASS:
+            new_mass = min(MAX_MASS, self.genome.mass * (1.0 + MASS_GROWTH_RATE))
             if new_mass > self.genome.mass + 0.01:
-                mass_delta = new_mass - self.genome.mass
+                old_max = max_e
                 self.genome.mass = new_mass
-                # Adjust energy to new max: keep energy ratio
                 new_max = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
-                self.energy = self.energy * (new_max / max_e)
-                play_sound("lvl_up")  # mass up sound
+                # Keep energy ratio constant (preserve excess)
+                self.energy = self.energy * (new_max / old_max)
+                play_sound("lvl_up")
                 return  # mass growth consumes the tick
 
-        # Level growth: from accumulated experience
-        if self.level < MAX_LEVEL and self.exp >= EXP_PER_LEVEL * (self.level + 1):
+        # 2) LEVEL GROWTH: from accumulated experience
+        # EXP needed for next level: exponential scaling
+        exp_needed = EXP_PER_LEVEL_BASE * (EXP_PER_LEVEL_MULT ** self.level)
+        if self.level < MAX_LEVEL and self.exp >= exp_needed:
             self.level += 1
             play_sound("lvl_up")
 
-        # Level down: from energy depletion (old behavior preserved for emergencies)
+        # 3) Level down: from energy depletion (emergency)
         if energy_ratio <= LEVEL_DOWN_THRESHOLD and self.level > 0:
             self.level -= 1
             play_sound("lvl_down")
 
         # Clamp energy
+        max_e = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
         self.energy = max(0.0, min(max_e, self.energy))
 
     # ── Phase 10: social + memory ──
