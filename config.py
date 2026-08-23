@@ -63,6 +63,7 @@ MASS_DMG_EFFICIENCY = 0.035
 MIN_MASS_DMG_EFF = 0.45
 
 # ── Level system ─────────────────────────────────────────────────
+LEVEL_UP_THRESHOLD = 0.85  # kept for backward compatibility
 LEVEL_DOWN_THRESHOLD = 0.25   # Was 3.0 — lose level at 25% energy
 MAX_LEVEL = 20
 LEVEL_MASS_BASE = 2.0
@@ -82,8 +83,8 @@ LEVEL_SENSE_BONUS = 0.03     # +3% sense per level
 LEVEL_DAMAGE_BONUS = 0.05    # +5% damage per level
 LEVEL_METAB_BONUS = 0.02     # -2% metabolism cost per level
 # Mass growth from energy surplus
-MASS_GROWTH_ENERGY_RATIO = 0.98  # 98% of max energy → grow mass
-MASS_GROWTH_RATE = 0.005         # 0.5% mass per tick at full energy
+MASS_GROWTH_ENERGY_RATIO = 0.99  # 99% of max energy → grow mass (rare)
+MASS_GROWTH_RATE = 0.003         # 0.3% mass per tick at full energy (very slow)
 MAX_MASS = 8.0
 # Division conditions
 DIVIDE_ENERGY_RATIO = 0.70

@@ -571,26 +571,28 @@ class Cell:
             mass_eff = max(0.5, min(2.0, 5.0 / self.genome.mass))
             diet_eff = PHOT_FEED_EFFICIENCY if d == PHOT else POLY_FEED_EFFICIENCY
             self.energy += eat * FEED_EFFICIENCY_BASE * mass_eff * diet_eff
+            if eat > 0:
+                self.exp += eat * EXP_PER_FEED  # EXP from eating food
         elif d == ZOOP or d == POLY:
-                    # Zoophagy: gain energy from consuming phototrophs
-                    sense = max(8.0, self.genome.sense)
-                    zoophagy_mult = field.zoophagy_mult if field else 1.0
-                    for j in get_neighbors(grid, self.x, self.y, radius=1):
-                        other = cells[j]
-                        if (
-                            other is not self
-                            and other.energy > 0
-                            and other.genome.diet == PHOT
-                            and other.cls != self.cls
-                        ):
-                            dx = other.x - self.x
-                            dy = other.y - self.y
-                            if dx * dx + dy * dy <= sense * sense:
-                                # Parasitic feeding: ZOOP drains energy from PHOT
-                                                                # Restored gain for ZOOP survival
-                                                                feed_gain = min(2.5, other.energy * 0.1 * zoophagy_mult)  # was 1.5/0.06
-                                                                self.energy += feed_gain * COMBAT_DAMAGE_GAIN
-                                                                break
+            # Zoophagy: gain energy from consuming phototrophs
+            sense = max(8.0, self.genome.sense)
+            zoophagy_mult = field.zoophagy_mult if field else 1.0
+            for j in get_neighbors(grid, self.x, self.y, radius=1):
+                other = cells[j]
+                if (
+                    other is not self
+                    and other.energy > 0
+                    and other.genome.diet == PHOT
+                    and other.cls != self.cls
+                ):
+                    dx = other.x - self.x
+                    dy = other.y - self.y
+                    if dx * dx + dy * dy <= sense * sense:
+                        # Parasitic feeding: ZOOP drains energy from PHOT
+                        feed_gain = min(2.5, other.energy * 0.1 * zoophagy_mult)
+                        self.energy += feed_gain * COMBAT_DAMAGE_GAIN
+                        self.exp += EXP_PER_FEEDING  # EXP from feeding
+                        break
 
     # ── Phase 6: combat ──
     def combat_phase(self, cells, grid, pack_decision, dt, field=None, attackers=None):
@@ -1101,8 +1103,10 @@ class Cell:
                 self.chase_timer = 180
 
     def can_divide(self):
-        """Check if cell can divide based on energy and age."""
+        """Check if cell can divide based on energy, age, and level."""
         if self.age < DIVIDE_MIN_AGE:
+            return False
+        if self.level < DIVIDE_MIN_LEVEL:
             return False
         if self.energy < self.max_energy * DIVIDE_ENERGY_RATIO:
             return False
@@ -1177,10 +1181,10 @@ class Cell:
             return
         if not self.can_divide():
             return
-        # divide_chance: probability per tick when conditions are met.
-        # Scaled by level — higher-level cells divide less often.
-        level_penalty = 1.0 - (self.level / MAX_LEVEL) * 0.7  # 30% less chance at max level
-        if random.random() > self.genome.divide_chance * level_penalty:
+        # Divide chance: base probability per tick, scaled by level.
+        # Higher-level cells divide less often (investment-heavy).
+        level_penalty = 1.0 - (self.level / MAX_LEVEL) * 0.7
+        if random.random() > DIVIDE_CHANCE_BASE * level_penalty:
             return
 
         child = self.divide(temperature)
