@@ -59,6 +59,11 @@ from config import (
     ZOO_INITIAL_ENERGY,
     PHOT_INITIAL_ENERGY,
     POLY_INITIAL_ENERGY,
+    EXP_PER_INTERACTION,
+    EXP_PER_KILL,
+    EXP_PER_COOP,
+    EXP_PER_LEVEL,
+    MASS_GROWTH_ENERGY_RATIO,
     YEL,
     WHITE,
     CYAN,
@@ -206,6 +211,7 @@ class Cell:
         self._heartbeat_timer = 0
         self.level = 0
         self.age = 0
+        self.exp = 0.0        # experience points from social interactions
 
         self.refresh_class()
 
@@ -647,17 +653,20 @@ class Cell:
                     # B2 fix: record_threat for killed prey, not cooperation
                     if other.energy <= 0:
                         self.memory.record_threat(enemy_cls, magnitude=0.5)
+                        self.exp += EXP_PER_KILL  # EXP for killing
 
                     if my_diet in (ZOOP, POLY):
-                                            mass_eff = max(
-                                                MIN_MASS_DMG_EFF,
-                                                1.0 - (my_mass - 4.0) * MASS_DMG_EFFICIENCY,
-                                            )
-                                            if my_diet == ZOOP:
-                                                de = PHOT_FEED_EFFICIENCY * zoophagy * 1.0  # full combat gain for ZOOP survival
-                                            else:
-                                                de = POLY_FEED_EFFICIENCY
-                                            self.energy += amount * COMBAT_DAMAGE_GAIN * mass_eff * de
+                        mass_eff = max(
+                            MIN_MASS_DMG_EFF,
+                            1.0 - (my_mass - 4.0) * MASS_DMG_EFFICIENCY,
+                        )
+                        if my_diet == ZOOP:
+                            de = PHOT_FEED_EFFICIENCY * zoophagy * 1.0  # full combat gain for ZOOP survival
+                        else:
+                            de = POLY_FEED_EFFICIENCY
+                        self.energy += amount * COMBAT_DAMAGE_GAIN * mass_eff * de
+                    # EXP for attacking any cell
+                    self.exp += amount * EXP_PER_INTERACTION
 
     # ── Phase 7: metabolism ──
     def metabolism_phase(self, dt, temperature=0.7):
@@ -714,29 +723,40 @@ class Cell:
 
     # ── Phase 9: level ──
     def level_phase(self):
+        """Level system: mass grows from energy surplus, levels from experience.
+
+        - 100% energy → grows MASS (biomass accumulation, not level)
+        - EXP from social interactions → grows LEVEL (combat/cooperation bonus)
+        """
         max_e = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
         old_level = self.level
-        if self.level < MAX_LEVEL:
-            # Grow mass — never shrink
-            next_mass = min(8.0, self.genome.mass * 1.15)
-            next_max = next_mass * next_mass * ENERGY_MASS_COEFF
-            threshold = next_max * 0.75
-            if self.energy >= threshold:
-                self.level += 1
-                self.genome.mass = next_mass
+        old_mass = self.genome.mass
+
+        # Mass growth: when at full energy, convert excess to mass
+        energy_ratio = self.energy / max_e if max_e > 0 else 0.0
+        if energy_ratio >= MASS_GROWTH_ENERGY_RATIO and self.genome.mass < 8.0:
+            new_mass = min(8.0, self.genome.mass * 1.02)  # 2% mass growth per tick at full energy
+            if new_mass > self.genome.mass + 0.01:
+                mass_delta = new_mass - self.genome.mass
+                self.genome.mass = new_mass
+                # Adjust energy to new max: keep energy ratio
                 new_max = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
-                self.energy = new_max * 0.70
-        elif self.energy <= LEVEL_DOWN_THRESHOLD and self.level > 0:
-            self.level -= 1
+                self.energy = self.energy * (new_max / max_e)
+                play_sound("lvl_up")  # mass up sound
+                return  # mass growth consumes the tick
 
-        # Clamp energy after level changes
-        self.energy = max(0.0, min(max_e, self.energy))
-
-        # Play level up/down sounds
-        if self.level > old_level:
+        # Level growth: from accumulated experience
+        if self.level < MAX_LEVEL and self.exp >= EXP_PER_LEVEL * (self.level + 1):
+            self.level += 1
             play_sound("lvl_up")
-        elif self.level < old_level:
+
+        # Level down: from energy depletion (old behavior preserved for emergencies)
+        if energy_ratio <= LEVEL_DOWN_THRESHOLD and self.level > 0:
+            self.level -= 1
             play_sound("lvl_down")
+
+        # Clamp energy
+        self.energy = max(0.0, min(max_e, self.energy))
 
     # ── Phase 10: social + memory ──
     def social_phase(self, cells, grid):
@@ -782,8 +802,12 @@ class Cell:
 
                     self.interact_with(other)
 
+                    # EXP for social interaction
+                    self.exp += EXP_PER_INTERACTION
+
                     if self.energy > 30.0:
                         self.memory.record_cooperation(enemy_cls, magnitude=0.1)
+                        self.exp += EXP_PER_COOP
                     elif self.energy < 15.0:
                         self.memory.record_threat(enemy_cls, magnitude=0.2)
                     break
@@ -1085,6 +1109,7 @@ class Cell:
         # giving the offspring a distinct appearance class.
         child.age = 0
         child.level = random.randint(0, self.level)
+        child.exp = self.exp * 0.5  # child inherits half the parent's EXP
         child.genome.mass = LEVEL_MASS_BASE + child.level * LEVEL_MASS_STEP
         child._lr = self._lr
         child.memory = self.memory.clone()  # Deep copy to avoid shared memory

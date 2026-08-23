@@ -71,6 +71,12 @@ LEVEL_DOWN_THRESHOLD = 0.25   # Was 3.0 — lose level at 25% energy
 MAX_LEVEL = 10
 LEVEL_MASS_BASE = 2.0
 LEVEL_MASS_STEP = 0.6
+# Experience system
+EXP_PER_INTERACTION = 2.0   # EXP gained per social interaction
+EXP_PER_KILL = 5.0          # EXP gained per kill
+EXP_PER_COOP = 3.0          # EXP gained per cooperation event
+EXP_PER_LEVEL = 10.0        # EXP needed to level up (linear scaling)
+MASS_GROWTH_ENERGY_RATIO = 0.98  # 98% of max energy → grow mass
 
 # ── Lifespan / aging ─────────────────────────────────────────────
 

@@ -33,6 +33,7 @@ def save_cells(cells_to_save):
                 "energy": c.energy,
                 "level": c.level,
                 "age": c.age,
+                "exp": getattr(c, 'exp', 0.0),
                 "genes": {
                     "speed": c.genome.speed,
                     "sense": c.genome.sense,
