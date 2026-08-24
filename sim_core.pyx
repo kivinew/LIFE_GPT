@@ -31,8 +31,8 @@ cdef int _POLY = 2
 
 cdef double _ENERGY_MASS_COEFF = 4.5          # config: ENERGY_MASS_COEFF
 cdef double _LEVEL_UP_THRESHOLD = 0.60        # config: LEVEL_UP_THRESHOLD
-cdef double _LEVEL_DOWN_THRESHOLD = 3.0       # config: LEVEL_DOWN_THRESHOLD
-cdef int _MAX_LEVEL = 10                      # config: MAX_LEVEL
+cdef double _LEVEL_DOWN_THRESHOLD = 0.25       # config: LEVEL_DOWN_THRESHOLD (ratio)
+cdef int _MAX_LEVEL = 20                     # config: MAX_LEVEL
 cdef double _LEVEL_MASS_BASE = 2.0            # config: LEVEL_MASS_BASE
 cdef double _LEVEL_MASS_STEP = 0.6            # config: LEVEL_MASS_STEP
 
@@ -180,32 +180,13 @@ def apply_metabolism_and_feeding(
         elif energies[i] > max_e:
             energies[i] = max_e
 
-        # ── Level system ──
-        # Level up: if at current level, 75% of next tier's max energy is met
-        if level_arr[i] < _MAX_LEVEL:
-            next_mass = mass_arr[i] * 1.15
-            if next_mass > 8.0:
-                next_mass = 8.0
-            next_max = next_mass * next_mass * _ENERGY_MASS_COEFF
-            if energies[i] >= next_max * 0.75:
-                level_arr[i] += 1
-                mass_arr[i] = next_mass
-                new_max = mass_arr[i] * mass_arr[i] * _ENERGY_MASS_COEFF
-                energies[i] = new_max * 0.70
+        # ── Level system (handled by Cell.level_phase in Python) ──
+        # Level up/mass growth is done in Python via level_phase() which has
+        # access to EXP. Cython only clamps energy here.
 
-        # Level down: if at max level, energy falls below threshold, decrease level
-        if energies[i] <= _LEVEL_DOWN_THRESHOLD and level_arr[i] > 0:
-            # Calculate current mass limit
-            max_mass = max(_MIN_MASS, c_sqrt_math(energies[i] / _ENERGY_MASS_COEFF))
-            current_mass = mass_arr[i]
-            target_mass = current_mass * 0.9  # Reduce mass by 10%
-            if target_mass >= _MIN_MASS and target_mass <= 8.0 and target_mass < current_mass:
-                mass_arr[i] = target_mass
-                new_max = mass_arr[i] * mass_arr[i] * _ENERGY_MASS_COEFF
-                # Cap to current energy for smooth transition
-                cap_energy = min(energies[i], new_max)
-                energies[i] = cap_energy * 0.95
-                level_arr[i] -= 1
+        # ── Level down: from energy depletion ──
+        if energies[i] <= max_e * _LEVEL_DOWN_THRESHOLD and level_arr[i] > 0:
+            level_arr[i] -= 1
 
 
 def build_spatial_grid(

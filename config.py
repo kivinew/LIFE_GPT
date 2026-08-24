@@ -87,10 +87,10 @@ MASS_GROWTH_ENERGY_RATIO = 0.99  # 99% of max energy → grow mass (rare)
 MASS_GROWTH_RATE = 0.003         # 0.3% mass per tick at full energy (very slow)
 MAX_MASS = 8.0
 # Division conditions
-DIVIDE_ENERGY_RATIO = 0.70
-DIVIDE_MIN_AGE = 150
-DIVIDE_CHANCE_BASE = 0.25     # 25% chance per tick when ready
-DIVIDE_MIN_LEVEL = 2          # min level to divide
+DIVIDE_ENERGY_RATIO = 0.80    # 80% energy to divide
+DIVIDE_MIN_AGE = 200          # min age to divide
+DIVIDE_CHANCE_BASE = 0.15     # 15% chance per tick when ready
+DIVIDE_MIN_LEVEL = 1          # min level 1 to divide
 
 # ── Lifespan / aging ─────────────────────────────────────────────
 
@@ -121,9 +121,9 @@ MAJOR_SENSE_RATE = 0.5
 DIET_DEFAULT_SPEED = {PHOT: 1.0, ZOOP: 3.0, POLY: 2.0}
 DIET_DEFAULT_SENSE = {PHOT: 50.0, ZOOP: 120.0, POLY: 65.0}
 
-# Division
-DIVIDE_ENERGY_RATIO = 0.70
-DIVIDE_MIN_AGE = 150
+# Division (duplicate definition removed — see above)
+# DIVIDE_ENERGY_RATIO = 0.80
+# DIVIDE_MIN_AGE = 200
 
 # Temp mutation
 TEMP_MUT_DEFAULT = 0.5

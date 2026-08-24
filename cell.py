@@ -1049,6 +1049,11 @@ class Cell:
         if not _HAVE_SIM_CORE:
             self.feed_phase(field, cells, grid, dt)
             self.metabolism_phase(dt, field.temperature)
+        # EXP gain from feeding (Cython path doesn't expose eat amount, so
+        # grant EXP from energy surplus as proxy for successful feeding)
+        elif self.energy >= self.max_energy * 0.5:
+            self.exp += EXP_PER_FEED * 0.1  # EXP for surviving well
+        self.exp += EXP_PER_INTERACTION * 0.01  # tiny EXP every tick for being alive
         self.stress_phase()
         self._heartbeat_tick()
         self.level_phase()
