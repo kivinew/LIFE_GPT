@@ -191,7 +191,7 @@ MAX_CELLS = 500
 DECOMPOSITION_TICKS = 150  # visual decay duration of a corpse (ticks), reduced from 300
 LIFESPAN_PER_MASS = 200
 AGING_DAMAGE = 0.3
-ZOO_INITIAL_ENERGY = 80.0  # Raised from 35.0 — ZOOP starts with enough energy to hunt before starving
+ZOO_INITIAL_ENERGY = 70.0  # Adjusted to fit within max_energy (mass² * ENERGY_MASS_COEFF); starts at same level as PHOT
 PHOT_INITIAL_ENERGY = (
     70.0  # Added — PHOT starts with more energy to survive initial period
 )
