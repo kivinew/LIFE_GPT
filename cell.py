@@ -762,6 +762,9 @@ class Cell:
         - Level gives bonuses: speed, sense, damage, metabolism reduction
         """
         max_e = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
+        # Clamp energy BEFORE computing ratio to prevent overflow when max_energy
+        # changes (e.g., after mass growth or initial state with excess energy)
+        self.energy = max(0.0, min(max_e, self.energy))
         old_level = self.level
 
         # Compute energy ratio
