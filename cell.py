@@ -779,6 +779,11 @@ class Cell:
                 new_max = self.genome.mass * self.genome.mass * ENERGY_MASS_COEFF
                 # Keep energy ratio constant (preserve excess)
                 self.energy = self.energy * (new_max / old_max)
+                # Clamp to new max after scaling — handles overflow from
+                # initial state where energy exceeds max_energy due to
+                # level-down mass reset (mass=LEVEL_MASS_BASE=2.0 → max=18.0
+                # but initial energy 70.0 >> 18.0)
+                self.energy = min(self.energy, new_max)
                 play_sound("lvl_up")
                 return  # mass growth consumes the tick
 
